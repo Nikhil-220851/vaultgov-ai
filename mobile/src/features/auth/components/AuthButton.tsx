@@ -6,7 +6,6 @@ import { PhoneIcon } from './icons/PhoneIcon';
 import { ArrowIcon } from './icons/ArrowIcon';
 import { AuthButtonProps } from '../types/auth.types';
 import { styles } from '../styles/auth.styles';
-import { Colors } from '@/theme';
 
 export function AuthButton({
   title,
@@ -16,34 +15,47 @@ export function AuthButton({
   disabled = false,
 }: AuthButtonProps) {
   const IconComponent = iconType === 'google' ? GoogleIcon : PhoneIcon;
+  // Visual variant: Google = primary blue solid; OTP = outlined secondary
+  const isPrimary = iconType === 'google';
 
   return (
     <AnimatedPressable
       onPress={onPress}
       disabled={disabled || loading}
       style={[
-        styles.authButton,
+        isPrimary ? styles.authButton : styles.authButtonSecondary,
         (disabled || loading) && styles.authButtonDisabled,
       ]}
     >
       <View style={styles.authButtonContent}>
         {/* Left Icon Badge Container */}
-        <View style={styles.iconBadge}>
-          <IconComponent />
+        <View style={isPrimary ? styles.iconBadge : styles.iconBadgeSecondary}>
+          <IconComponent isPrimary={isPrimary} />
         </View>
 
         {/* Centered Button Title */}
         <View style={styles.textContainer}>
           {loading ? (
-            <ActivityIndicator size="small" color={Colors.primaryBlue} />
+            <ActivityIndicator
+              size="small"
+              color={isPrimary ? '#FFFFFF' : '#1977F3'}
+            />
           ) : (
-            <Text style={styles.authButtonText}>{title}</Text>
+            <Text
+              style={
+                isPrimary
+                  ? styles.authButtonText
+                  : styles.authButtonTextSecondary
+              }
+            >
+              {title}
+            </Text>
           )}
         </View>
 
         {/* Right Arrow Icon */}
         <View style={styles.arrowContainer}>
-          <ArrowIcon />
+          <ArrowIcon isPrimary={isPrimary} />
         </View>
       </View>
     </AnimatedPressable>

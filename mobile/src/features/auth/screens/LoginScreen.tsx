@@ -36,25 +36,13 @@ export function LoginScreen() {
     }
   };
 
-  const handleOtpSignIn = async () => {
-    if (googleLoading || otpLoading) return;
-    setOtpLoading(true);
-    try {
-      const response = await AuthService.signInWithOTP();
-      if (response.success) {
-        // Redirect to explore upon successful sign-in
-        router.replace('/explore' as any);
-      }
-    } catch (error) {
-      console.error('OTP sign-in error:', error);
-    } finally {
-      setOtpLoading(false);
-    }
+  const handleOtpSignIn = () => {
+    router.push('/mobile-number' as any);
   };
 
   return (
-    <ScreenContainer safeAreaStyle={{ backgroundColor: '#F8F8F8' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8F8F8" />
+    <ScreenContainer safeAreaStyle={{ backgroundColor: '#F7F8F5' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F8F5" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardAvoidingView}

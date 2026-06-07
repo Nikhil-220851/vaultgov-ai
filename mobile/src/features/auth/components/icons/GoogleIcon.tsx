@@ -1,27 +1,16 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Colors, Typography } from '@/theme';
+import { FontAwesome6 } from '@expo/vector-icons';
 
-export function GoogleIcon() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.letter}>G</Text>
-    </View>
-  );
+interface IconProps {
+  isPrimary?: boolean;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  letter: {
-    fontFamily: Typography.fontFamilies.heading,
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#5F6368', // Elegant Google-style neutral dark gray
-    textAlign: 'center',
-  },
-});
+export function GoogleIcon({ isPrimary = false }: IconProps) {
+  return (
+    <FontAwesome6
+      name="google"
+      size={18}
+      color={isPrimary ? '#FFFFFF' : '#1977F3'}
+    />
+  );
+}
