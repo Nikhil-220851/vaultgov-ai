@@ -1,6 +1,15 @@
 import React from 'react';
-import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { useRouter } from 'expo-router';
+import { OnboardingScreen } from '../features/onboarding';
 
 export default function OnboardingPage() {
-  return <OnboardingScreen />;
+  const router = useRouter();
+
+  const handleFinish = () => {
+    // After onboarding is complete, navigate to the main app.
+    // Using push so the back gesture is disabled on the stack.
+    router.replace('/explore' as any);
+  };
+
+  return <OnboardingScreen onFinish={handleFinish} />;
 }
