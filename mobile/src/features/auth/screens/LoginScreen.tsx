@@ -12,33 +12,55 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { AuthButton } from '../components/AuthButton';
 import { AuthDivider } from '../components/AuthDivider';
-import { AuthService } from '../services/auth.service';
+import { useGoogleAuth } from '../services/googleauth.service';
 import { styles } from '../styles/auth.styles';
 
 export function LoginScreen() {
   const router = useRouter();
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
+  const { request, signIn } = useGoogleAuth();
 
-  const handleGoogleSignIn = async () => {
-    if (googleLoading || otpLoading) return;
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // ─── Google OAuth ────────────────────────────────────────────────────────────
+
+  const handleGoogleLogin = async () => {
+    if (googleLoading) return;
     setGoogleLoading(true);
+
     try {
-      const response = await AuthService.signInWithGoogle();
-      if (response.success) {
-        // Redirect to explore upon successful sign-in
+      const user = await signIn();
+
+      if (user) {
+        // STEP 15 — Store authenticated user details
+        // TODO: Persist user to a global store (e.g. Zustand / Context)
+        console.log('[LoginScreen] Authenticated user:', {
+          uid: user.uid,
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+        });
+
+        // Navigate to the main app on success
         router.replace('/explore' as any);
+      } else {
+        // User cancelled or an error occurred — already logged in the service
+        console.log('[LoginScreen] Google sign-in did not complete.');
       }
     } catch (error) {
-      console.error('Google sign-in error:', error);
+      // Defensive catch — individual errors are already handled inside useGoogleAuth
+      console.error('[LoginScreen] Unexpected error during Google login:', error);
     } finally {
       setGoogleLoading(false);
     }
   };
 
-  const handleOtpSignIn = () => {
+  // ─── OTP Flow (unchanged) ────────────────────────────────────────────────────
+
+  const handleOtpLogin = () => {
     router.push('/mobile-number' as any);
   };
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <ScreenContainer safeAreaStyle={{ backgroundColor: '#F7F8F5' }}>
@@ -53,11 +75,12 @@ export function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            {/* Header Section */}
+
+            {/* ── Header ─────────────────────────────────────────────────────── */}
             <View style={styles.headerSection}>
-              {/* Center Icon Card */}
+
+              {/* Center Icon Card — government temple built from pure Views */}
               <View style={styles.logoCard}>
-                {/* Government temple logo built from pure React Native Views */}
                 <View style={styles.buildingIconContainer}>
                   <View style={styles.buildingRoof} />
                   <View style={styles.buildingArchitrave} />
@@ -71,23 +94,21 @@ export function LoginScreen() {
                 </View>
               </View>
 
-              {/* App Title */}
               <Text style={styles.title}>Welcome to VaultGov</Text>
-
-              {/* Subtitle */}
               <Text style={styles.subtitle}>
                 Your personal government document assistant
               </Text>
             </View>
 
-            {/* Auth Buttons Section */}
+            {/* ── Auth Buttons ────────────────────────────────────────────────── */}
             <View style={styles.buttonSection}>
               <AuthButton
                 title="Continue with Google"
                 iconType="google"
-                onPress={handleGoogleSignIn}
+                onPress={handleGoogleLogin}
                 loading={googleLoading}
-                disabled={otpLoading}
+                // Disable button until expo-auth-session has built the request object
+                disabled={!request || googleLoading}
               />
 
               <AuthDivider />
@@ -95,13 +116,13 @@ export function LoginScreen() {
               <AuthButton
                 title="Continue with OTP"
                 iconType="otp"
-                onPress={handleOtpSignIn}
-                loading={otpLoading}
+                onPress={handleOtpLogin}
+                loading={false}
                 disabled={googleLoading}
               />
             </View>
 
-            {/* Footer Agreements */}
+            {/* ── Footer ─────────────────────────────────────────────────────── */}
             <View style={styles.footer}>
               <Text style={styles.footerText}>By continuing you agree to our</Text>
               <View style={styles.footerLinks}>
@@ -112,12 +133,12 @@ export function LoginScreen() {
                   ]}
                   onPress={() => {
                     // TODO: Deep link to Terms of Service
-                    console.log('Navigate to Terms of Service');
+                    console.log('[Footer] Navigate to Terms of Service');
                   }}
                 >
                   <Text style={styles.footerLinkText}>Terms of Service</Text>
                 </Pressable>
-                
+
                 <Text style={styles.footerSeparator}>·</Text>
 
                 <Pressable
@@ -127,17 +148,19 @@ export function LoginScreen() {
                   ]}
                   onPress={() => {
                     // TODO: Deep link to Privacy Policy
-                    console.log('Navigate to Privacy Policy');
+                    console.log('[Footer] Navigate to Privacy Policy');
                   }}
                 >
                   <Text style={styles.footerLinkText}>Privacy Policy</Text>
                 </Pressable>
               </View>
             </View>
+
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
+
 export default LoginScreen;

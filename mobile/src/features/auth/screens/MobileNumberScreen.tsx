@@ -63,7 +63,7 @@ export function MobileNumberScreen() {
     try {
       await new Promise<void>((resolve) => setTimeout(() => resolve(), 1200));
       router.push({
-        pathname: '/verify-otp',
+        pathname: '/verify-otp' as any,
         params: { phone: digitsOnly },
       });
     } catch (err) {
