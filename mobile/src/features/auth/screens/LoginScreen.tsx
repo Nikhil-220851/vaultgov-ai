@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { AuthButton } from '../components/AuthButton';
 import { AuthDivider } from '../components/AuthDivider';
-import { useGoogleAuth } from '../services/googleauth.service';
+import { useGoogleAuth } from '@/services/authService';
 import { styles } from '../styles/auth.styles';
 
 export function LoginScreen() {
@@ -40,8 +40,8 @@ export function LoginScreen() {
           photoURL: user.photoURL,
         });
 
-        // Navigate to the main app on success
-        router.replace('/explore' as any);
+        // Navigate to the permissions screen on success
+        router.replace('/grant-permissions' as any);
       } else {
         // User cancelled or an error occurred — already logged in the service
         console.log('[LoginScreen] Google sign-in did not complete.');

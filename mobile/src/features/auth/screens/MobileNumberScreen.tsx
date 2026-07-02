@@ -15,6 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { AppLogo } from '@/components/AppLogo';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import app from '@/services/firebase';
+import { AuthService } from '@/services/authService';
 import { styles } from '../styles/auth.styles';
 
 export function MobileNumberScreen() {
@@ -27,6 +30,9 @@ export function MobileNumberScreen() {
 
   // Animated scale for checkbox tap feedback
   const checkboxScale = useRef(new Animated.Value(1)).current;
+
+  // Firebase ReCAPTCHA verifier ref
+  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
 
   const handleCheckboxPress = () => {
     setIsChecked(!isChecked);
@@ -61,13 +67,24 @@ export function MobileNumberScreen() {
     setLoading(true);
 
     try {
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 1200));
+      // Firebase Phone Authentication expects format: +91XXXXXXXXXX
+      const formattedPhone = `+91${digitsOnly}`;
+      await AuthService.sendOTP(formattedPhone, recaptchaVerifier.current);
+
       router.push({
         pathname: '/verify-otp' as any,
         params: { phone: digitsOnly },
       });
-    } catch (err) {
-      setError('Failed to send OTP. Please try again.');
+    } catch (err: any) {
+      console.error('[MobileNumberScreen] handleSendOtp failed:', err);
+      // Catch and display Firebase-specific authentication errors
+      if (err.code === 'auth/invalid-phone-number') {
+        setError('Invalid phone number format. Please check and try again.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many requests. Please try again later.');
+      } else {
+        setError(err.message || 'Failed to send OTP. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -223,6 +240,12 @@ export function MobileNumberScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifier}
+        firebaseConfig={app.options}
+        title="Verification Required"
+        cancelLabel="Cancel"
+      />
     </ScreenContainer>
   );
 }

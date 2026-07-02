@@ -15,7 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { AppLogo } from '@/components/AppLogo';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { AuthService } from '../services/auth.service';
+import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import app from '@/services/firebase';
+import { AuthService } from '@/services/authService';
 import { styles } from '../styles/auth.styles';
 
 export function OtpVerificationScreen() {
@@ -41,6 +43,9 @@ export function OtpVerificationScreen() {
   // Verify Action Loading state
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Firebase ReCAPTCHA verifier ref
+  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
 
   // Timer Effect
   useEffect(() => {
@@ -109,18 +114,30 @@ export function OtpVerificationScreen() {
     }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (!canResend) return;
 
-    setOtp(['', '', '', '', '', '']);
-    inputRefs.current[0]?.focus();
-    setFocusedIndex(0);
-
-    setTimeLeft(30);
-    setCanResend(false);
     setError(null);
-    setShowSuccessBanner(true);
-    bannerOpacity.setValue(1);
+    setLoading(true);
+
+    try {
+      const fullPhone = `+91${formattedPhone}`;
+      await AuthService.sendOTP(fullPhone, recaptchaVerifier.current);
+
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+      setFocusedIndex(0);
+
+      setTimeLeft(30);
+      setCanResend(false);
+      setShowSuccessBanner(true);
+      bannerOpacity.setValue(1);
+    } catch (err: any) {
+      console.error('[OtpVerificationScreen] resend failed:', err);
+      setError(err.message || 'Failed to resend OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerify = async () => {
@@ -134,14 +151,20 @@ export function OtpVerificationScreen() {
     setLoading(true);
 
     try {
-      const response = await AuthService.signInWithOTP();
-      if (response.success) {
-        router.replace('/explore' as any);
+      const user = await AuthService.verifyOTP(code);
+      console.log('[OtpVerificationScreen] Successfully authenticated user:', user.uid);
+      router.replace('/grant-permissions' as any);
+    } catch (err: any) {
+      console.error('[OtpVerificationScreen] verifyOTP failed:', err);
+      if (err.code === 'auth/invalid-verification-code') {
+        setError('Invalid OTP code. Please check the code and try again.');
+      } else if (err.code === 'auth/code-expired') {
+        setError('The OTP code has expired. Please request a new code.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many requests. Please try again later.');
       } else {
-        setError(response.error || 'Invalid OTP code. Please try again.');
+        setError(err.message || 'Verification failed. Please try again.');
       }
-    } catch (err) {
-      setError('Verification failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -298,6 +321,12 @@ export function OtpVerificationScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifier}
+        firebaseConfig={app.options}
+        title="Verification Required"
+        cancelLabel="Cancel"
+      />
     </ScreenContainer>
   );
 }
