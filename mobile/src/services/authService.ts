@@ -1,6 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { GoogleAuthProvider, signInWithCredential, User, signOut, PhoneAuthProvider } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, User, signOut, signInAnonymously } from 'firebase/auth';
 import { auth } from './firebase';
 import { AuthResponse } from '@/features/auth/types/auth.types';
 
@@ -135,32 +135,42 @@ export const AuthService = {
   },
 
   /**
-   * Generates a Firebase phone verification request and sends an OTP SMS.
-   * Stores the verification ID in tempVerificationId.
+   * [DEV MODE] Simulates sending an OTP SMS.
+   *
+   * Firebase JS SDK phone auth requires native modules (google-services.json +
+   * @react-native-firebase/auth) which are unavailable in Expo Go. This mock
+   * bypasses PhoneAuthProvider entirely and simulates the full OTP flow so the
+   * UI can be tested end-to-end. Replace with real PhoneAuthProvider when
+   * migrating to a bare/managed build with native Firebase configuration.
    */
-  async sendOTP(phoneNumber: string, recaptchaVerifier: any): Promise<{ success: boolean }> {
-    console.log('[AuthService] Generating Firebase phone verification for:', phoneNumber);
-    const phoneProvider = new PhoneAuthProvider(auth);
-    const verificationId = await phoneProvider.verifyPhoneNumber(
-      phoneNumber,
-      recaptchaVerifier
-    );
-    tempVerificationId = verificationId;
-    console.log('[AuthService] Verification ID received and stored temporarily:', verificationId);
+  async sendOTP(phoneNumber: string, _recaptchaVerifier: any): Promise<{ success: boolean }> {
+    console.log('[AuthService] [DEV MOCK] Simulating OTP send to:', phoneNumber);
+    // Simulate a realistic network round-trip delay
+    await new Promise<void>((resolve) => setTimeout(resolve, 1200));
+    // Store a deterministic mock session token
+    tempVerificationId = `mock-session-${Date.now()}`;
+    console.log('[AuthService] [DEV MOCK] OTP "sent". Use any 6-digit code to verify.');
     return { success: true };
   },
 
   /**
-   * Verifies the 6-digit OTP code against the stored verification ID and signs in.
-   * Returns the authenticated Firebase user.
+   * [DEV MODE] Verifies the entered OTP code.
+   *
+   * Accepts any 6-digit numeric code and signs the user in anonymously via
+   * Firebase so a real Firebase User object is returned to the rest of the app.
    */
   async verifyOTP(otpCode: string): Promise<User> {
     if (!tempVerificationId) {
       throw new Error('No active verification session found. Please request a new OTP code.');
     }
-    console.log('[AuthService] Creating credential and verifying user with OTP...');
-    const credential = PhoneAuthProvider.credential(tempVerificationId, otpCode);
-    const userCredential = await signInWithCredential(auth, credential);
+    if (!/^\d{6}$/.test(otpCode)) {
+      throw new Error('Invalid OTP. Please enter the 6-digit code.');
+    }
+    console.log('[AuthService] [DEV MOCK] OTP accepted. Signing in anonymously...');
+    tempVerificationId = null;
+    // Sign in anonymously so the app receives a genuine Firebase User object
+    const userCredential = await signInAnonymously(auth);
+    console.log('[AuthService] [DEV MOCK] ✅ Signed in as anonymous user:', userCredential.user.uid);
     return userCredential.user;
   }
 };

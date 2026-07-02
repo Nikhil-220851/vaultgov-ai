@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { AppLogo } from '@/components/AppLogo';
 import { PrimaryButton } from '@/components/PrimaryButton';
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import { FirebaseRecaptchaVerifierModal } from '@/components/FirebaseRecaptchaVerifierModal';
 import app from '@/services/firebase';
 import { AuthService } from '@/services/authService';
 import { styles } from '../styles/auth.styles';
