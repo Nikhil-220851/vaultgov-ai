@@ -15,7 +15,7 @@ export function GrantPermissionsScreen() {
 
   const handleContinue = () => {
     // Navigate to the main application page
-    router.replace('/explore' as any);
+    router.replace('/(tabs)/home' as any);
   };
 
   return (
