@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Animated } from 'react-native';
 import { styles } from '../styles';
 
@@ -7,7 +7,8 @@ interface ProgressBarProps {
 }
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
-  const animatedWidth = useRef(new Animated.Value(0)).current;
+  // useState with lazy initializer: React Compiler-safe, stable across renders
+  const [animatedWidth] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(animatedWidth, {
@@ -15,7 +16,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
       duration: 1000,
       useNativeDriver: false, // width cannot use native driver
     }).start();
-  }, [progress]);
+  }, [progress, animatedWidth]);
 
   const widthStyle = animatedWidth.interpolate({
     inputRange: [0, 1],

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import { View, Text, Pressable, Animated } from 'react-native';
 import { styles } from '../styles';
 import { AppLogo } from '@/components/AppLogo';
@@ -9,7 +9,9 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ avatarInitials, onPressAvatar }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  // useState with lazy initializer is the React Compiler-safe way to create a
+  // stable Animated.Value – avoids the react-hooks/refs violation of .current in render.
+  const [scaleAnim] = useState(() => new Animated.Value(1));
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {

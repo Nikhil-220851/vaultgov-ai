@@ -3,7 +3,6 @@ import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth } from '@/services/firebase';
 import { styles } from './styles';
-import { Colors } from '@/theme';
 import {
   MOCK_USER,
   MOCK_DATE,
@@ -14,14 +13,14 @@ import {
   MOCK_QUICK_ACTIONS,
 } from './constants';
 
-// Subcomponents
-import Header from './components/Header';
-import Greeting from './components/Greeting';
-import HealthScoreCard from './components/HealthScoreCard';
-import OverviewCard from './components/OverviewCard';
-import AlertDocumentCard from './components/AlertDocumentCard';
-import SchemeCard from './components/SchemeCard';
-import QuickActionCard from './components/QuickActionCard';
+// Subcomponents — use named imports to satisfy import/no-named-as-default
+import { Header } from './components/Header';
+import { Greeting } from './components/Greeting';
+import { HealthScoreCard } from './components/HealthScoreCard';
+import { OverviewCard } from './components/OverviewCard';
+import { AlertDocumentCard } from './components/AlertDocumentCard';
+import { SchemeCard } from './components/SchemeCard';
+import { QuickActionCard } from './components/QuickActionCard';
 
 export const HomeScreen: React.FC = () => {
   // Pull logged-in user details if available, fallback to mock
