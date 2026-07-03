@@ -1,6 +1,7 @@
 import React from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { auth } from '@/services/firebase';
 import { styles } from './styles';
 import {
@@ -23,6 +24,7 @@ import { SchemeCard } from './components/SchemeCard';
 import { QuickActionCard } from './components/QuickActionCard';
 
 export const HomeScreen: React.FC = () => {
+  const router = useRouter();
   // Pull logged-in user details if available, fallback to mock
   const user = auth.currentUser;
   const displayName = user?.displayName || user?.phoneNumber || MOCK_USER.name;
@@ -35,6 +37,11 @@ export const HomeScreen: React.FC = () => {
 
   const handleOverviewPress = (id: string) => {
     console.log('[HomeScreen] Overview card pressed:', id);
+    if (id === 'docs' || id === 'expiring') {
+      router.push('/(tabs)/docs' as any);
+    } else if (id === 'schemes') {
+      router.push('/(tabs)/schemes' as any);
+    }
   };
 
   const handleAlertPress = (id: string) => {
@@ -84,7 +91,9 @@ export const HomeScreen: React.FC = () => {
         {/* Attention Needed Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitleDark}>ATTENTION NEEDED</Text>
-          <Text style={styles.seeAllText}>See all</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/docs' as any)}>
+            <Text style={styles.seeAllText}>See all</Text>
+          </TouchableOpacity>
         </View>
         {MOCK_ALERTS.map((alert) => (
           <AlertDocumentCard
@@ -97,7 +106,9 @@ export const HomeScreen: React.FC = () => {
         {/* Eligible Schemes Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitleDark}>ELIGIBLE SCHEMES</Text>
-          <Text style={styles.seeAllText}>View all</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/schemes' as any)}>
+            <Text style={styles.seeAllText}>View all</Text>
+          </TouchableOpacity>
         </View>
         {MOCK_SCHEMES.map((scheme) => (
           <SchemeCard
