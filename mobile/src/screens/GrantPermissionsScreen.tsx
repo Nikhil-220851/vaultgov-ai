@@ -226,8 +226,9 @@ export function GrantPermissionsScreen() {
   };
 
   const handleContinue = () => {
+    // Guard retained for defence-in-depth (button is also disabled={!allGranted})
     if (allGranted) {
-      router.replace('/explore' as any);
+      router.replace('/(tabs)/home' as any);
     }
   };
 
