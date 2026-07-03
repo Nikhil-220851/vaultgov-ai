@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Animated, useWindowDimensions, StyleSheet } from 'react-native';
+import { View, Animated, useWindowDimensions } from 'react-native';
 import { styles } from '../styles/onboarding.styles';
 import { Colors } from '@/theme';
 

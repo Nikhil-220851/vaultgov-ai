@@ -30,15 +30,15 @@ export function OtpVerificationScreen() {
   // OTP State: 6 individual character boxes
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [focusedIndex, setFocusedIndex] = useState<number>(0);
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   // Timer State (30 seconds)
   const [timeLeft, setTimeLeft] = useState<number>(30);
-  const [canResend, setCanResend] = useState<boolean>(false);
+  const canResend = timeLeft === 0;
 
   // Success alert visibility
   const [showSuccessBanner, setShowSuccessBanner] = useState<boolean>(true);
-  const bannerOpacity = useRef(new Animated.Value(1)).current;
+  const [bannerOpacity] = useState(() => new Animated.Value(1));
 
   // Verify Action Loading state
   const [loading, setLoading] = useState<boolean>(false);
@@ -50,7 +50,6 @@ export function OtpVerificationScreen() {
   // Timer Effect
   useEffect(() => {
     if (timeLeft === 0) {
-      setCanResend(true);
       return;
     }
     const timer = setInterval(() => {
@@ -72,7 +71,7 @@ export function OtpVerificationScreen() {
       }, 6000);
       return () => clearTimeout(timer);
     }
-  }, [showSuccessBanner]);
+  }, [showSuccessBanner, bannerOpacity]);
 
   const handleTextChange = (text: string, index: number) => {
     const cleanText = text.replace(/[^0-9]/g, '');
@@ -129,7 +128,6 @@ export function OtpVerificationScreen() {
       setFocusedIndex(0);
 
       setTimeLeft(30);
-      setCanResend(false);
       setShowSuccessBanner(true);
       bannerOpacity.setValue(1);
     } catch (err: any) {

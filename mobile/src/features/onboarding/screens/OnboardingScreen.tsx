@@ -12,7 +12,7 @@ export interface OnboardingScreenProps {
 
 export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const [scrollX] = useState(() => new Animated.Value(0));
   const flatListRef = useRef<FlatList>(null);
   const { width: windowWidth } = useWindowDimensions();
 

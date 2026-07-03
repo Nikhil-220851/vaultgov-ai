@@ -16,7 +16,7 @@
 
 // ─── Storage Keys ────────────────────────────────────────────────────────────
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   AUTH_USER: '@vaultgov/auth_user',
   ONBOARDING_COMPLETE: '@vaultgov/onboarding_complete',
 } as const;

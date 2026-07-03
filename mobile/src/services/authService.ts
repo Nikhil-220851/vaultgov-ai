@@ -18,7 +18,7 @@ WebBrowser.maybeCompleteAuthSession();
  * and `iosClientId` from the Google Cloud Console as well.
  */
 export const useGoogleAuth = () => {
-  const [request, response, promptAsync] = Google.useAuthRequest({
+  const [request, , promptAsync] = Google.useAuthRequest({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
   });

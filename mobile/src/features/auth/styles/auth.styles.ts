@@ -1,5 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
-import { Colors, Spacing, Typography, Radius } from '@/theme';
+import { Spacing, Typography, Radius } from '@/theme';
 
 // Using the same VaultGov AI design tokens as Splash and Onboarding screens
 // Primary Blue: #1977F3  |  Background: #F7F8F5  |  Dark Gray: #707070

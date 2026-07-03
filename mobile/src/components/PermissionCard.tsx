@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, Switch, Platform } from 'react-native';
+import { StyleSheet, Text, View, Switch, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/theme/colors';
 
@@ -9,6 +9,7 @@ export interface PermissionCardProps {
   description: string;
   value: boolean;
   onValueChange: (value: boolean) => void;
+  loading?: boolean;
 }
 
 export function PermissionCard({
@@ -17,6 +18,7 @@ export function PermissionCard({
   description,
   value,
   onValueChange,
+  loading,
 }: PermissionCardProps) {
   return (
     <View style={styles.cardContainer}>
@@ -31,14 +33,20 @@ export function PermissionCard({
         <Text style={styles.description}>{description}</Text>
       </View>
 
-      {/* Right Toggle Switch */}
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: '#E5E5EA', true: colors.primary }}
-        thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
-        ios_backgroundColor="#E5E5EA"
-      />
+      {/* Right Toggle Switch / ActivityIndicator */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : (
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: '#E5E5EA', true: colors.primary }}
+          thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
+          ios_backgroundColor="#E5E5EA"
+        />
+      )}
     </View>
   );
 }
@@ -73,5 +81,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.darkGray,
     lineHeight: 18,
+  },
+  loadingContainer: {
+    width: 51,
+    height: 31,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

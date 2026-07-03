@@ -1,3 +1,4 @@
+"use no memo";
 import React from 'react';
 import { Pressable, PressableProps, GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -19,11 +20,13 @@ export function AnimatedPressable({ children, style, ...props }: AnimatedPressab
   });
 
   const handlePressIn = (e: GestureResponderEvent) => {
+    // eslint-disable-next-line react-hooks/immutability
     scale.value = withSpring(0.96, { damping: 15, stiffness: 250 });
     props.onPressIn?.(e);
   };
 
   const handlePressOut = (e: GestureResponderEvent) => {
+    // eslint-disable-next-line react-hooks/immutability
     scale.value = withSpring(1, { damping: 15, stiffness: 250 });
     props.onPressOut?.(e);
   };

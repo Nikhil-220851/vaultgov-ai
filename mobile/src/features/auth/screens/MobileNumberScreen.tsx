@@ -29,7 +29,7 @@ export function MobileNumberScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Animated scale for checkbox tap feedback
-  const checkboxScale = useRef(new Animated.Value(1)).current;
+  const [checkboxScale] = useState(() => new Animated.Value(1));
 
   // Firebase ReCAPTCHA verifier ref
   const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
@@ -143,7 +143,7 @@ export function MobileNumberScreen() {
 
               <Text style={styles.title}>Enter Mobile Number</Text>
               <Text style={[styles.subtitle, { marginBottom: 24 }]}>
-                We'll send a 6-digit OTP to verify your identity. No password needed.
+                {"We'll send a 6-digit OTP to verify your identity. No password needed."}
               </Text>
 
               {/* Input Section */}

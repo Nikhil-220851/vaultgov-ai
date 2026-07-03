@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, ActivityIndicator, ViewStyle, TextStyle, StyleProp, Platform } from 'react-native';
 import { AnimatedPressable } from './AnimatedPressable';
-import { Typography, Radius, Spacing } from '@/theme';
+import { Typography, Radius } from '@/theme';
 
 export interface PrimaryButtonProps {
   title: string;
