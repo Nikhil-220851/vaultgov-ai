@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,9 +22,18 @@ import { OverviewCard } from './components/OverviewCard';
 import { AlertDocumentCard } from './components/AlertDocumentCard';
 import { SchemeCard } from './components/SchemeCard';
 import { QuickActionCard } from './components/QuickActionCard';
+import { UploadDocumentSheet } from '@/features/documents/components/UploadDocumentSheet';
+import {
+  captureWithCamera,
+  pickFromGallery,
+  pickPdfDocument,
+  SelectedFile,
+} from '@/features/documents/upload.service';
 
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
   // Pull logged-in user details if available, fallback to mock
   const user = auth.currentUser;
   const displayName = user?.displayName || user?.phoneNumber || MOCK_USER.name;
@@ -52,8 +61,50 @@ export const HomeScreen: React.FC = () => {
     console.log('[HomeScreen] Eligible scheme card pressed:', id);
   };
 
+  // ── Upload sheet handlers ──────────────────────────────────────────────────
+
+  const handleFileSelected = useCallback((file: SelectedFile) => {
+    router.push({
+      pathname: '/document-preview' as any,
+      params: {
+        uri: file.uri,
+        name: file.name,
+        mimeType: file.mimeType,
+        source: file.source,
+        size: file.size !== undefined ? String(file.size) : '',
+      },
+    });
+  }, [router]);
+
+  const handleTakePhoto = useCallback(async () => {
+    setIsSheetOpen(false);
+    setTimeout(async () => {
+      const file = await captureWithCamera();
+      if (file) handleFileSelected(file);
+    }, 300);
+  }, [handleFileSelected]);
+
+  const handleUploadPdf = useCallback(async () => {
+    setIsSheetOpen(false);
+    setTimeout(async () => {
+      const file = await pickPdfDocument();
+      if (file) handleFileSelected(file);
+    }, 300);
+  }, [handleFileSelected]);
+
+  const handleUploadImage = useCallback(async () => {
+    setIsSheetOpen(false);
+    setTimeout(async () => {
+      const file = await pickFromGallery();
+      if (file) handleFileSelected(file);
+    }, 300);
+  }, [handleFileSelected]);
+
   const handleQuickActionPress = (id: string) => {
     console.log('[HomeScreen] Quick action card pressed:', id);
+    if (id === 'upload') {
+      setIsSheetOpen(true);
+    }
   };
 
   return (
@@ -130,6 +181,16 @@ export const HomeScreen: React.FC = () => {
           />
         ))}
       </ScrollView>
+
+      {/* Shared Upload Document Bottom Sheet */}
+      <UploadDocumentSheet
+        visible={isSheetOpen}
+        onClose={() => setIsSheetOpen(false)}
+        onFilePicked={handleFileSelected}
+        onTakePhoto={handleTakePhoto}
+        onUploadPdf={handleUploadPdf}
+        onUploadImage={handleUploadImage}
+      />
     </SafeAreaView>
   );
 };

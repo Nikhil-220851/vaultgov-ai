@@ -1,14 +1,17 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, Alert } from 'react-native';
+import { View, Text, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { auth } from '@/services/firebase';
+import { Colors } from '@/theme';
 import { MOCK_USER } from '@/features/home/constants';
-import { MOCK_DOCUMENTS, CategoryType } from './documents.constants';
+import { CategoryType } from './documents.constants';
 import { DocumentCard } from './components/DocumentCard';
 import { DocumentSearchBar } from './components/DocumentSearchBar';
 import { CategoryFilter } from './components/CategoryFilter';
 import { AddDocumentButton } from './components/AddDocumentButton';
 import { UploadDocumentSheet } from './components/UploadDocumentSheet';
+import { useDocumentStore } from './store/useDocumentStore';
 import {
   captureWithCamera,
   pickFromGallery,
@@ -18,6 +21,8 @@ import {
 import { styles } from './documents.styles';
 
 export const DocumentsScreen: React.FC = () => {
+  const router = useRouter();
+  const { documents, isHydrating } = useDocumentStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('All');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -40,20 +45,17 @@ export const DocumentsScreen: React.FC = () => {
   // ── Upload sheet handlers ──────────────────────────────────────────────────
 
   const handleFileSelected = useCallback((file: SelectedFile) => {
-    // TODO: pass file to backend upload service when available
-    console.log('[DocumentsScreen] File selected for upload:', {
-      name: file.name,
-      mimeType: file.mimeType,
-      source: file.source,
-      size: file.size,
-      uri: file.uri,
+    router.push({
+      pathname: '/document-preview' as any,
+      params: {
+        uri: file.uri,
+        name: file.name,
+        mimeType: file.mimeType,
+        source: file.source,
+        size: file.size !== undefined ? String(file.size) : '',
+      },
     });
-    Alert.alert(
-      'File ready',
-      `"${file.name}" selected. Backend upload integration pending.`,
-      [{ text: 'OK' }]
-    );
-  }, []);
+  }, [router]);
 
   const handleTakePhoto = useCallback(async () => {
     setIsSheetOpen(false);
@@ -82,7 +84,7 @@ export const DocumentsScreen: React.FC = () => {
 
   // ── Filtering ────────────────────────────────────────────────────────────
 
-  const filteredDocuments = MOCK_DOCUMENTS.filter((doc) => {
+  const filteredDocuments = documents.filter((doc) => {
     const matchesCategory =
       selectedCategory === 'All' || doc.category === selectedCategory;
     const query = searchQuery.trim().toLowerCase();
@@ -92,6 +94,16 @@ export const DocumentsScreen: React.FC = () => {
       doc.subtitle.toLowerCase().includes(query);
     return matchesCategory && matchesSearch;
   });
+
+  if (isHydrating) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F8F5' }}>
+          <ActivityIndicator size="large" color={Colors.primaryBlue} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
