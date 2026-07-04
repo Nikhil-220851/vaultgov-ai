@@ -11,7 +11,7 @@
  * - Uses existing theme tokens throughout.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   View,
@@ -116,8 +116,8 @@ export const UploadDocumentSheet: React.FC<UploadDocumentSheetProps> = ({
   onUploadImage,
 }) => {
   const insets = useSafeAreaInsets();
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const sheetTranslateY = useRef(new Animated.Value(300)).current;
+  const [overlayOpacity] = useState(() => new Animated.Value(0));
+  const [sheetTranslateY] = useState(() => new Animated.Value(300));
 
   // ── Animations ───────────────────────────────────────────────────────────
   useEffect(() => {

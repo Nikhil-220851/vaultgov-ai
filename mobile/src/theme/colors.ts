@@ -1,13 +1,13 @@
 export const Colors = {
-  primaryBlue: '#1677F0',
-  softBlue: '#C9D2F0',
+  primaryBlue: '#1977F3',
+  softBlue: '#C8CDE8',
   primaryOrange: '#FF9800',
-  primaryGreen: '#34C759',
+  primaryGreen: '#3CC556',
   dangerRed: '#FF3B30',
   softPink: '#F1D0D0',
-  darkGray: '#666666',
+  darkGray: '#707070',
   pureBlack: '#000000',
-  background: '#F8F8F8',
+  background: '#F7F8F5',
   white: '#FFFFFF',
 } as const;
 
