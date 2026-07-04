@@ -1,5 +1,5 @@
 "use no memo";
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import Animated, {
   withDelay,
   withSpring,
   withTiming,
+  cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,7 +49,12 @@ export function ApplicationSuccessScreen() {
   const btnsTranslateY = useSharedValue(20);
   const pulseScale = useSharedValue(1);
 
+  // Guard to prevent stale animation callbacks from firing after unmount
+  const isMounted = useRef(true);
+
   useEffect(() => {
+    isMounted.current = true;
+
     // 1. Circle fade-in + scale
     circleOpacity.value = withTiming(1, { duration: 400 });
     circleScale.value = withSpring(1, { damping: 12, stiffness: 120 });
@@ -71,19 +77,26 @@ export function ApplicationSuccessScreen() {
     btnsOpacity.value = withDelay(900, withTiming(1, { duration: 400, easing: Easing.out(Easing.quad) }));
     btnsTranslateY.value = withDelay(900, withTiming(0, { duration: 400, easing: Easing.out(Easing.quad) }));
 
-    // 6. Pulse loop on circle
+    // 6. Pulse loop on circle — guarded so callbacks never fire after unmount.
+    //    cancelAnimation() in the cleanup stops any in-flight animation immediately.
     const runPulse = () => {
+      if (!isMounted.current) return;
       pulseScale.value = withTiming(1.1, { duration: 800 }, (finished) => {
-        if (finished) {
+        if (finished && isMounted.current) {
           pulseScale.value = withTiming(1, { duration: 800 }, (f2) => {
-            if (f2) runPulse();
+            if (f2 && isMounted.current) runPulse();
           });
         }
       });
     };
     const t = setTimeout(runPulse, 1200);
-    return () => clearTimeout(t);
-  }, [circleOpacity, circleScale, checkScale, titleOpacity, titleTranslateY, cardOpacity, cardTranslateY, btnsOpacity, btnsTranslateY, pulseScale]);
+
+    return () => {
+      isMounted.current = false;
+      clearTimeout(t);
+      cancelAnimation(pulseScale);
+    };
+  }, [circleOpacity, circleScale, checkScale, titleOpacity, titleTranslateY, cardOpacity, cardTranslateY, btnsOpacity, btnsTranslateY, pulseScale, isMounted]);
 
   const circleStyle = useAnimatedStyle(() => ({
     opacity: circleOpacity.value,

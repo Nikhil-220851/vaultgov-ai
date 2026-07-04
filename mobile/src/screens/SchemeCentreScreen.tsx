@@ -14,7 +14,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
+  withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -108,7 +109,10 @@ export function SchemeCentreScreen() {
 
   const handleTabPress = (tab: Tab, index: number) => {
     setActiveTab(tab);
-    tabIndicatorX.value = withSpring(index * TAB_WIDTH, { damping: 18, stiffness: 200 });
+    tabIndicatorX.value = withTiming(index * TAB_WIDTH, {
+      duration: 200,
+      easing: Easing.out(Easing.quad),
+    });
     setSearchQuery('');
   };
 
