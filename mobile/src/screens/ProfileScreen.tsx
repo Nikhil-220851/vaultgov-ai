@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
-import { ProfileStatCard } from '@/components/profile/ProfileStatCard';
 import { InformationCard } from '@/components/profile/InformationCard';
 import { SettingsCard } from '@/components/profile/SettingsCard';
 import { LinkedServicesCard } from '@/components/profile/LinkedServicesCard';
@@ -127,37 +126,10 @@ export function ProfileScreen() {
         <ProfileHeader
           name={MOCK_USER.name}
           phone={MOCK_USER.phone}
-          email={MOCK_USER.email}
           avatarInitials={MOCK_USER.avatarInitials}
           isVerified={MOCK_USER.isVerified}
           onEditPress={() => handleSettingPress('edit profile')}
-          onSettingsPress={() => handleSettingPress('settings')}
         />
-
-        {/* ─── Stats Row ───────────────────────────────────────────────── */}
-        <View style={styles.statsRow}>
-          <ProfileStatCard
-            icon="document-text-outline"
-            label="Documents"
-            value={12}
-            color={Colors.primaryBlue}
-          />
-          <View style={styles.statGap} />
-          <ProfileStatCard
-            icon="ribbon-outline"
-            label="Schemes"
-            value={3}
-            color="#9C27B0"
-          />
-          <View style={styles.statGap} />
-          <ProfileStatCard
-            icon="shield-checkmark-outline"
-            label="Health Score"
-            value={78}
-            color={Colors.primaryGreen}
-            suffix=""
-          />
-        </View>
 
         {/* ─── Personal Information ─────────────────────────────────── */}
         <SectionHeader title="Personal Information" />
@@ -231,15 +203,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 120,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xs,
-  },
-  statGap: {
-    width: Spacing.sm,
   },
   signOutWrap: {
     marginHorizontal: Spacing.md,

@@ -24,12 +24,10 @@ interface ProfileHeaderProps {
 export function ProfileHeader({
   name,
   phone,
-  email,
   avatarInitials,
   isVerified,
   onEditPress,
-  onSettingsPress,
-}: ProfileHeaderProps) {
+}: Omit<ProfileHeaderProps, 'onSettingsPress' | 'email'>) {
   const [editScale] = useState(() => new Animated.Value(1));
 
   const handleEditPressIn = () => {
@@ -50,24 +48,6 @@ export function ProfileHeader({
 
   return (
     <View style={styles.container}>
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <View style={styles.logoRow}>
-          <View style={styles.logoIconWrap}>
-            <Ionicons name="shield-checkmark" size={18} color={Colors.primaryBlue} />
-          </View>
-          <Text style={styles.logoText}>VaultGov</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.settingsBtn}
-          onPress={onSettingsPress}
-          activeOpacity={0.75}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="settings-outline" size={22} color={Colors.primaryBlue} />
-        </TouchableOpacity>
-      </View>
-
       {/* Avatar + Info row */}
       <View style={styles.profileRow}>
         <View style={styles.avatarWrap}>
@@ -92,7 +72,6 @@ export function ProfileHeader({
             )}
           </View>
           <Text style={styles.phone}>{phone}</Text>
-          {email ? <Text style={styles.email}>{email}</Text> : null}
         </View>
       </View>
 

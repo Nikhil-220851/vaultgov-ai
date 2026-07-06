@@ -1,7 +1,8 @@
 import React from 'react';
-import { ScrollView, Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { CATEGORIES, CategoryType } from '../documents.constants';
 import { styles } from '../documents.styles';
+import { SegmentedTabs } from '@/components/SegmentedTabs';
 
 interface CategoryFilterProps {
   selectedCategory: CategoryType;
@@ -14,29 +15,12 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
 }) => {
   return (
     <View style={styles.categoriesContainer}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesScrollContent}
-      >
-        {CATEGORIES.map((category) => {
-          const isActive = selectedCategory === category;
-          return (
-            <Pressable
-              key={category}
-              onPress={() => onSelectCategory(category)}
-              accessibilityRole="button"
-              accessibilityLabel={`Filter: ${category}`}
-              accessibilityState={{ selected: isActive }}
-              style={[styles.chip, isActive && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                {category}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <SegmentedTabs
+        tabs={[...CATEGORIES]}
+        activeTab={selectedCategory}
+        onChangeTab={(tab) => onSelectCategory(tab as CategoryType)}
+        scrollable={true}
+      />
     </View>
   );
 };

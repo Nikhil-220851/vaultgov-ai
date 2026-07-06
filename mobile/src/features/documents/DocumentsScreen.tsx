@@ -16,6 +16,7 @@ import {
   SelectedFile,
 } from './upload.service';
 import { styles } from './documents.styles';
+import { AppHeader } from '@/components/AppHeader';
 
 export const DocumentsScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,10 +96,10 @@ export const DocumentsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>My vault</Text>
+      {/* Header */}
+      <AppHeader
+        leftElement={<Text style={styles.headerTitle}>My vault</Text>}
+        rightElement={
           <Pressable
             accessibilityLabel="User profile avatar"
             accessibilityRole="button"
@@ -109,8 +110,12 @@ export const DocumentsScreen: React.FC = () => {
               <Text style={styles.avatarText}>{avatarInitials}</Text>
             </View>
           </Pressable>
-        </View>
+        }
+        backgroundColor="#F7F8F5"
+        borderBottomColor="transparent"
+      />
 
+      <View style={styles.container}>
         {/* Search Bar */}
         <DocumentSearchBar value={searchQuery} onChangeText={setSearchQuery} />
 

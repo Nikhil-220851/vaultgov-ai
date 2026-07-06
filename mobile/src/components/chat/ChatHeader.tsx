@@ -54,7 +54,7 @@ export function ChatHeader({ onBackPress, onClearPress }: ChatHeaderProps) {
 
 const styles = StyleSheet.create({
   container: {
-    height: Platform.OS === 'ios' ? 70 : 76,
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

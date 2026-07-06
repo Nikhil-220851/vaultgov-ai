@@ -12,13 +12,6 @@ export const styles = StyleSheet.create({
   },
   
   // Header section
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
   headerTitle: {
     fontSize: 28,
     fontWeight: Typography.weights.bold,
@@ -81,32 +74,7 @@ export const styles = StyleSheet.create({
   categoriesContainer: {
     marginBottom: Spacing.md,
   },
-  categoriesScrollContent: {
-    paddingRight: Spacing.md,
-  },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: '#E6E6E6',
-    backgroundColor: Colors.white,
-    marginRight: Spacing.sm,
-  },
-  chipActive: {
-    backgroundColor: Colors.pureBlack,
-    borderColor: Colors.pureBlack,
-  },
-  chipText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-    fontFamily: Typography.fontFamilies.sans,
-    color: Colors.darkGray,
-  },
-  chipTextActive: {
-    color: Colors.white,
-    fontWeight: Typography.weights.semibold,
-  },
+
 
   // Documents List
   listContent: {

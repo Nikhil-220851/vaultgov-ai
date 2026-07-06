@@ -11,15 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { useRouter } from 'expo-router';
-
+import { Ionicons } from '@expo/vector-icons';
 import {
   SCHEMES,
   Scheme,
@@ -67,10 +61,6 @@ export function SchemeCentreScreen() {
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [appliedSchemes, setAppliedSchemes] = useState<AppliedScheme[]>(MOCK_APPLIED);
 
-  // Tab indicator animation
-  const tabIndicatorX = useSharedValue(0);
-  const TAB_WIDTH = 110;
-
   useEffect(() => {
     const loadSavedIds = async () => {
       try {
@@ -107,18 +97,10 @@ export function SchemeCentreScreen() {
     });
   }, []);
 
-  const handleTabPress = (tab: Tab, index: number) => {
+  const handleTabPress = (tab: Tab) => {
     setActiveTab(tab);
-    tabIndicatorX.value = withTiming(index * TAB_WIDTH, {
-      duration: 200,
-      easing: Easing.out(Easing.quad),
-    });
     setSearchQuery('');
   };
-
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: tabIndicatorX.value }],
-  }));
 
   // ─── Filtered Schemes ───────────────────────────────────────────────────────
 
@@ -296,40 +278,20 @@ export function SchemeCentreScreen() {
         </View>
 
         {/* Tab Pills */}
-        <View style={styles.tabContainer}>
-          <Animated.View style={[styles.tabIndicator, indicatorStyle]} />
-          {(['eligible', 'applied', 'saved'] as Tab[]).map((tab, index) => {
-            const labels: Record<Tab, string> = {
-              eligible: 'Eligible',
-              applied: 'Applied',
-              saved: 'Saved',
-            };
-            const counts: Record<Tab, number | null> = {
-              eligible: filteredEligible.length,
-              applied: appliedSchemes.length,
-              saved: savedIds.length,
-            };
-            const isActive = activeTab === tab;
-            return (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tab, { width: TAB_WIDTH }]}
-                onPress={() => handleTabPress(tab, index)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                  {labels[tab]}
-                </Text>
-                {counts[tab] !== null && counts[tab]! > 0 && (
-                  <View style={[styles.tabCount, isActive && styles.tabCountActive]}>
-                    <Text style={[styles.tabCountText, isActive && styles.tabCountTextActive]}>
-                      {counts[tab]}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+        <View style={{ paddingHorizontal: Spacing.md, marginBottom: Spacing.sm }}>
+          <SegmentedTabs
+            tabs={['Eligible', 'Applied', 'Saved']}
+            activeTab={activeTab === 'eligible' ? 'Eligible' : activeTab === 'applied' ? 'Applied' : 'Saved'}
+            onChangeTab={(tab) => {
+              const tabKey = tab === 'Eligible' ? 'eligible' : tab === 'Applied' ? 'applied' : 'saved';
+              handleTabPress(tabKey);
+            }}
+            badges={{
+              Eligible: filteredEligible.length,
+              Applied: appliedSchemes.length,
+              Saved: savedIds.length,
+            }}
+          />
         </View>
       </View>
 
@@ -402,7 +364,7 @@ const styles = StyleSheet.create({
   },
   headerTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.md,
@@ -425,7 +387,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 6,
   },
   iconBtn: {
     width: 40,
@@ -457,70 +418,6 @@ const styles = StyleSheet.create({
   searchWrap: {
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.md,
-  },
-  // ── Tabs ────────────────────────────────────────────────────────────────────
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F0F0F5',
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    borderRadius: 12,
-    padding: 3,
-    position: 'relative',
-  },
-  tabIndicator: {
-    position: 'absolute',
-    top: 3,
-    left: 3,
-    width: 110,
-    height: '100%',
-    backgroundColor: colors.white,
-    borderRadius: 10,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-      },
-      android: { elevation: 2 },
-    }),
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    gap: 5,
-    zIndex: 1,
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: Typography.weights.medium,
-    color: Colors.darkGray,
-  },
-  tabTextActive: {
-    color: colors.black,
-    fontWeight: Typography.weights.semibold,
-  },
-  tabCount: {
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 99,
-    backgroundColor: '#E5E5EA',
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  tabCountActive: {
-    backgroundColor: colors.primary + '20',
-  },
-  tabCountText: {
-    fontSize: 10,
-    fontWeight: Typography.weights.bold,
-    color: Colors.darkGray,
-  },
-  tabCountTextActive: {
-    color: colors.primary,
   },
   // ── List ────────────────────────────────────────────────────────────────────
   listContent: {
