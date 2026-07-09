@@ -12,9 +12,8 @@
  *  idle       – renders nothing
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
   Text,
   ActivityIndicator,
   StyleSheet,
@@ -29,7 +28,7 @@ interface OCRStatusBannerProps {
 }
 
 export const OCRStatusBanner: React.FC<OCRStatusBannerProps> = ({ status }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [fadeAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (status === 'idle') {
@@ -38,6 +37,7 @@ export const OCRStatusBanner: React.FC<OCRStatusBannerProps> = ({ status }) => {
       Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
     }
   }, [status, fadeAnim]);
+
 
   if (status === 'idle') return null;
 

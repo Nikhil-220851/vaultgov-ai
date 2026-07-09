@@ -23,12 +23,19 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Firebase Auth with AsyncStorage persistence so auth state survives app restarts.
-// initializeAuth is called only on the first load; subsequent hot-reloads re-use
-// the already-initialised Auth instance via getAuth().
-export const auth: Auth = getApps().length === 1
-  ? initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    })
-  : getAuth(app);
+// We use try/catch here because on hot-reload, getApps().length is already 1
+// (the app was initialized above), but the Auth instance may also already exist.
+// Calling initializeAuth on an already-initialized Auth throws "Firebase: Firebase App named
+// '[DEFAULT]' already exists". getAuth() safely returns the existing instance.
+let _auth: Auth;
+try {
+  _auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch {
+  // Auth already initialized (hot-reload) — reuse existing instance
+  _auth = getAuth(app);
+}
+export const auth: Auth = _auth;
 
 export default app;
