@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, StatusBar, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -27,6 +27,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 
   const subtitleOpacity = useSharedValue(0);
   const subtitleTranslateY = useSharedValue(15);
+
+  const hasFinishedRef = useRef(false);
 
   useEffect(() => {
     // 1. Logo entrance: Fade In + Scale (600ms)
@@ -73,7 +75,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 
     // 4. Auto-advance callback after 2500ms (duration of splash)
     const timeout = setTimeout(() => {
-      if (onFinish) {
+      if (onFinish && !hasFinishedRef.current) {
+        hasFinishedRef.current = true;
         onFinish();
       }
     }, 2500);

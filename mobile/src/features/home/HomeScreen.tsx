@@ -3,6 +3,7 @@ import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { auth } from '@/services/firebase';
+import { useUser } from '@/context/UserContext';
 import { styles } from './styles';
 import {
   MOCK_USER,
@@ -33,12 +34,13 @@ import {
 export const HomeScreen: React.FC = () => {
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const { user: dbUser } = useUser();
 
   // Pull logged-in user details if available, fallback to mock
-  const user = auth.currentUser;
-  const displayName = user?.displayName || user?.phoneNumber || MOCK_USER.name;
+  const displayName = dbUser?.full_name || auth.currentUser?.displayName || auth.currentUser?.phoneNumber || MOCK_USER.name;
   // Get first letter of name for avatar
   const avatarInitials = displayName ? displayName.trim().charAt(0).toUpperCase() : MOCK_USER.avatarInitials;
+
 
   const handleAvatarPress = () => {
     console.log('[HomeScreen] User profile avatar pressed');

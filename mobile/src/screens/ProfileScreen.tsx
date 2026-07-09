@@ -8,8 +8,10 @@ import {
   StatusBar,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { InformationCard } from '@/components/profile/InformationCard';
@@ -18,28 +20,7 @@ import { LinkedServicesCard } from '@/components/profile/LinkedServicesCard';
 import { DocumentHealthCard } from '@/components/profile/DocumentHealthCard';
 import { SignOutCard } from '@/components/profile/SignOutCard';
 import { Colors, Spacing, Typography, Radius } from '@/theme';
-
-// ─── Mock data ───────────────────────────────────────────────────────────────
-
-const MOCK_USER = {
-  name: 'Arjun Mehta',
-  phone: '+91 81794 79468',
-  email: 'arjun.mehta@gmail.com',
-  avatarInitials: 'A',
-  isVerified: true,
-};
-
-const PERSONAL_INFO = [
-  { id: 'aadhaar', icon: 'finger-print-outline' as const, label: 'Aadhaar Number', value: 'XXXX XXXX 4821', isVerified: true },
-  { id: 'dob', icon: 'calendar-outline' as const, label: 'Date of Birth', value: '15 March 1998', isVerified: false },
-  { id: 'gender', icon: 'person-outline' as const, label: 'Gender', value: 'Male', isVerified: false },
-  { id: 'state', icon: 'location-outline' as const, label: 'State', value: 'Maharashtra', isVerified: false },
-  { id: 'district', icon: 'map-outline' as const, label: 'District', value: 'Pune', isVerified: false },
-  { id: 'email', icon: 'mail-outline' as const, label: 'Email Address', value: 'arjun.mehta@gmail.com', isVerified: false },
-  { id: 'mobile', icon: 'call-outline' as const, label: 'Mobile Number', value: '+91 81794 79468', isVerified: true },
-  { id: 'occupation', icon: 'briefcase-outline' as const, label: 'Occupation', value: 'Software Engineer', isVerified: false },
-  { id: 'income', icon: 'cash-outline' as const, label: 'Income Category', value: 'EWS (Below ₹3L)', isVerified: false },
-];
+import { useUser } from '@/context/UserContext';
 
 const ACCOUNT_SETTINGS = [
   { id: 'privacy', icon: 'lock-closed-outline' as const, label: 'Privacy & Security', description: 'Manage PIN, biometric & data' },
@@ -49,8 +30,6 @@ const ACCOUNT_SETTINGS = [
   { id: 'help', icon: 'help-circle-outline' as const, label: 'Help & Support', description: 'FAQs, contact us, feedback' },
   { id: 'about', icon: 'information-circle-outline' as const, label: 'About VaultGov', description: 'Version 1.0.0 · Legal & Privacy' },
 ];
-
-// ─── Section Header ───────────────────────────────────────────────────────────
 
 function SectionHeader({ title }: { title: string }) {
   return (
@@ -74,8 +53,6 @@ const sectionStyles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 });
-
-// ─── Section Card Wrapper ─────────────────────────────────────────────────────
 
 function SectionCard({ children }: { children: React.ReactNode }) {
   return <View style={cardWrapStyles.card}>{children}</View>;
@@ -101,17 +78,51 @@ const cardWrapStyles = StyleSheet.create({
   },
 });
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-
 export function ProfileScreen() {
-  const handleSignOut = () => {
-    // In production: call Firebase signOut()
-    console.log('[ProfileScreen] User signed out');
+  const router = useRouter();
+  const { user, isLoading, signOut } = useUser();
+
+  const handleSignOut = async () => {
+    try {
+      console.log('[ProfileScreen] User initiating sign out...');
+      await signOut();
+      router.replace('/login' as any);
+    } catch (error) {
+      console.error('[ProfileScreen] Sign out failed:', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
   };
 
   const handleSettingPress = (id: string) => {
     Alert.alert('Coming Soon', `The "${id}" section is coming in the next update.`);
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primaryBlue} />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Parse initials from name
+  const name = user?.full_name || 'Citizen User';
+  const phone = user?.mobile_number || 'Not Linked';
+  const email = user?.email || 'Not Linked';
+  const avatarInitials = name.trim().charAt(0).toUpperCase();
+
+  const personalInfo = [
+    { id: 'aadhaar', icon: 'finger-print-outline' as const, label: 'Aadhaar Status', value: user?.aadhaar_verified ? 'Verified' : 'Not Verified', isVerified: !!user?.aadhaar_verified },
+    { id: 'dob', icon: 'calendar-outline' as const, label: 'Date of Birth', value: user?.date_of_birth || 'Not Provided', isVerified: false },
+    { id: 'gender', icon: 'person-outline' as const, label: 'Gender', value: user?.gender || 'Not Provided', isVerified: false },
+    { id: 'state', icon: 'location-outline' as const, label: 'State', value: user?.state || 'Not Provided', isVerified: false },
+    { id: 'district', icon: 'map-outline' as const, label: 'District', value: user?.district || 'Not Provided', isVerified: false },
+    { id: 'email', icon: 'mail-outline' as const, label: 'Email Address', value: email, isVerified: false },
+    { id: 'mobile', icon: 'call-outline' as const, label: 'Mobile Number', value: phone, isVerified: true },
+    { id: 'occupation', icon: 'briefcase-outline' as const, label: 'Occupation', value: user?.occupation || 'Not Provided', isVerified: false },
+    { id: 'income', icon: 'cash-outline' as const, label: 'Income Category', value: user?.annual_income ? `${user.annual_income} Slab` : 'Not Provided', isVerified: false },
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -124,17 +135,17 @@ export function ProfileScreen() {
       >
         {/* ─── Header ──────────────────────────────────────────────────── */}
         <ProfileHeader
-          name={MOCK_USER.name}
-          phone={MOCK_USER.phone}
-          avatarInitials={MOCK_USER.avatarInitials}
-          isVerified={MOCK_USER.isVerified}
+          name={name}
+          phone={phone}
+          avatarInitials={avatarInitials}
+          isVerified={!!user?.aadhaar_verified}
           onEditPress={() => handleSettingPress('edit profile')}
         />
 
         {/* ─── Personal Information ─────────────────────────────────── */}
         <SectionHeader title="Personal Information" />
         <SectionCard>
-          {PERSONAL_INFO.map((item, index) => (
+          {personalInfo.map((item) => (
             <InformationCard
               key={item.id}
               icon={item.icon}
@@ -215,4 +226,18 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: Typography.sizes.sm,
+    color: Colors.darkGray,
+    fontFamily: Typography.fontFamilies.sans,
+  },
 });
+
+export default ProfileScreen;

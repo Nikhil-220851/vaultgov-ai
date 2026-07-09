@@ -18,6 +18,11 @@ import { colors } from '@/theme/colors';
 import { Camera } from 'expo-camera';
 import Constants, { AppOwnership } from 'expo-constants';
 import * as MediaLibrary from 'expo-media-library/legacy';
+import { auth } from '@/services/firebase';
+import { apiClient } from '@/services/api';
+import { useUser } from '@/context/UserContext';
+
+
 
 const isExpoGo = Constants.appOwnership === AppOwnership.Expo;
 // Conditionally require expo-notifications only if NOT running in Expo Go.
@@ -52,8 +57,10 @@ function useToast() {
 export function GrantPermissionsScreen() {
   const router = useRouter();
   const { toast, opacity: toastOpacity, show: showToast } = useToast();
+  const { setUser } = useUser();
 
   // ── Permission granted state ──────────────────────────────────────────────
+
   const [cameraEnabled, setCameraEnabled]             = useState(false);
   const [storageEnabled, setStorageEnabled]           = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -225,12 +232,26 @@ export function GrantPermissionsScreen() {
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     // Guard retained for defence-in-depth (button is also disabled={!allGranted})
     if (allGranted) {
-      router.replace('/(tabs)/home' as any);
+      try {
+        const uid = auth.currentUser?.uid;
+        if (uid) {
+          console.log('[GrantPermissions] Updating database with onboarding_permissions_seen: true');
+          const updatedUser = await apiClient.updatePermissions(uid, {
+            onboarding_permissions_seen: true,
+          });
+          setUser(updatedUser);
+        }
+      } catch (err) {
+        console.warn('[GrantPermissions] Failed to sync permissions to Neon DB:', err);
+      } finally {
+        router.replace('/(tabs)/home' as any);
+      }
     }
   };
+
 
   return (
     <ScreenContainer safeAreaStyle={styles.safeArea} style={styles.container}>

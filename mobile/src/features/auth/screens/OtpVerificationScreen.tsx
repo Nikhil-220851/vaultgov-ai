@@ -18,11 +18,13 @@ import { PrimaryButton } from '@/components/PrimaryButton';
 import { FirebaseRecaptchaVerifierModal } from '@/components/FirebaseRecaptchaVerifierModal';
 import app from '@/services/firebase';
 import { AuthService } from '@/services/authService';
+import { usePostAuthRedirect } from '@/hooks/usePostAuthRedirect';
 import { styles } from '../styles/auth.styles';
 
 export function OtpVerificationScreen() {
   const router = useRouter();
   const { phone } = useLocalSearchParams<{ phone: string }>();
+  const postAuthRedirect = usePostAuthRedirect();
 
   const formattedPhone = phone ? phone : '9876543210';
   const maskedPhone = `+91 XXXXX${formattedPhone.slice(-5)}`;
@@ -151,7 +153,7 @@ export function OtpVerificationScreen() {
     try {
       const user = await AuthService.verifyOTP(code);
       console.log('[OtpVerificationScreen] Successfully authenticated user:', user.uid);
-      router.replace('/grant-permissions' as any);
+      await postAuthRedirect(user);
     } catch (err: any) {
       console.error('[OtpVerificationScreen] verifyOTP failed:', err);
       if (err.code === 'auth/invalid-verification-code') {

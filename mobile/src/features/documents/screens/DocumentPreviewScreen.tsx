@@ -121,7 +121,7 @@ export const DocumentPreviewScreen: React.FC<DocumentPreviewScreenProps> = ({
             <Ionicons name="alert-circle-outline" size={36} color={Colors.dangerRed} />
             <Text style={styles.failedTitle}>Details not found</Text>
             <Text style={styles.failedText}>
-              We couldn't extract details from this document. Please try again with a clearer picture or file.
+              {"We couldn't extract details from this document. Please try again with a clearer picture or file."}
             </Text>
           </View>
         )}

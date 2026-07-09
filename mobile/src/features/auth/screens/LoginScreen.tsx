@@ -13,11 +13,13 @@ import { ScreenContainer } from '@/components/ScreenContainer';
 import { AuthButton } from '../components/AuthButton';
 import { AuthDivider } from '../components/AuthDivider';
 import { useGoogleAuth } from '@/services/authService';
+import { usePostAuthRedirect } from '@/hooks/usePostAuthRedirect';
 import { styles } from '../styles/auth.styles';
 
 export function LoginScreen() {
   const router = useRouter();
   const { request, signIn } = useGoogleAuth();
+  const postAuthRedirect = usePostAuthRedirect();
 
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -31,8 +33,6 @@ export function LoginScreen() {
       const user = await signIn();
 
       if (user) {
-        // STEP 15 — Store authenticated user details
-        // TODO: Persist user to a global store (e.g. Zustand / Context)
         console.log('[LoginScreen] Authenticated user:', {
           uid: user.uid,
           displayName: user.displayName,
@@ -40,12 +40,13 @@ export function LoginScreen() {
           photoURL: user.photoURL,
         });
 
-        // Navigate to the permissions screen on success
-        router.replace('/grant-permissions' as any);
+        // Smart redirect (fetches/upserts user profile and routes correctly)
+        await postAuthRedirect(user);
       } else {
         // User cancelled or an error occurred — already logged in the service
         console.log('[LoginScreen] Google sign-in did not complete.');
       }
+
     } catch (error) {
       // Defensive catch — individual errors are already handled inside useGoogleAuth
       console.error('[LoginScreen] Unexpected error during Google login:', error);

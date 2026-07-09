@@ -71,7 +71,6 @@ interface DocumentStoreContextValue {
   addDocument: (doc: DocumentItem) => void;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 export const DocumentStoreContext = createContext<DocumentStoreContextValue>(null!);
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
