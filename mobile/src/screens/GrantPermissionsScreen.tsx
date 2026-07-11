@@ -70,7 +70,7 @@ export function GrantPermissionsScreen() {
   const [storageLoading, setStorageLoading]           = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
 
-  const allGranted = cameraEnabled && storageEnabled && notificationsEnabled;
+  const requiredPermissionsGranted = cameraEnabled && notificationsEnabled;
 
   // ── Show permanently denied alert with Settings link ─────────────────────
   const showPermanentlyDeniedAlert = () => {
@@ -90,12 +90,23 @@ export function GrantPermissionsScreen() {
       setCameraEnabled(cameraRes.granted);
 
       if (!isExpoGo) {
-        const [storageRes, notificationsRes] = await Promise.all([
-          MediaLibrary.getPermissionsAsync(false, ['photo', 'video']),
-          Notifications.getPermissionsAsync(),
-        ]);
-        setStorageEnabled(storageRes.granted);
-        setNotificationsEnabled(notificationsRes.granted);
+        let storageGranted = false;
+        try {
+          const storageRes = await MediaLibrary.getPermissionsAsync(false, ['photo']);
+          storageGranted = storageRes.granted;
+        } catch (err) {
+          console.warn('[GrantPermissions] Storage permission check failed:', err);
+        }
+        setStorageEnabled(storageGranted);
+
+        let notificationsGranted = false;
+        try {
+          const notificationsRes = await Notifications.getPermissionsAsync();
+          notificationsGranted = notificationsRes.granted;
+        } catch (err) {
+          console.error('[GrantPermissions] Notifications permission check failed:', err);
+        }
+        setNotificationsEnabled(notificationsGranted);
       }
     } catch (error) {
       console.error('[GrantPermissions] Error checking permissions:', error);
@@ -167,14 +178,14 @@ export function GrantPermissionsScreen() {
 
     setStorageLoading(true);
     try {
-      const statusObj = await MediaLibrary.getPermissionsAsync(false, ['photo', 'video']);
+      const statusObj = await MediaLibrary.getPermissionsAsync(false, ['photo']);
 
       if (statusObj.status === 'denied' && !statusObj.canAskAgain) {
         showPermanentlyDeniedAlert();
         return;
       }
 
-      const reqObj = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+      const reqObj = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
       if (reqObj.granted) {
         setStorageEnabled(true);
         showToast('✓ Storage Enabled');
@@ -182,7 +193,8 @@ export function GrantPermissionsScreen() {
         setStorageEnabled(false);
       }
     } catch (err) {
-      console.error('[GrantPermissions] Storage error:', err);
+      console.warn('[GrantPermissions] Storage error:', err);
+      setStorageEnabled(false);
     } finally {
       setStorageLoading(false);
     }
@@ -233,8 +245,8 @@ export function GrantPermissionsScreen() {
   };
 
   const handleContinue = async () => {
-    // Guard retained for defence-in-depth (button is also disabled={!allGranted})
-    if (allGranted) {
+    // Guard retained for defence-in-depth (button is also disabled={!requiredPermissionsGranted})
+    if (requiredPermissionsGranted) {
       try {
         const uid = auth.currentUser?.uid;
         if (uid) {
@@ -305,17 +317,17 @@ export function GrantPermissionsScreen() {
 
       {/* Bottom Continue Button */}
       <View style={styles.buttonContainer}>
-        {!allGranted && (
+        {!requiredPermissionsGranted && (
           <Text style={styles.helperText}>
             Grant all required permissions to continue.
           </Text>
         )}
         <Pressable
-          disabled={!allGranted}
+          disabled={!requiredPermissionsGranted}
           style={({ pressed }) => [
             styles.button,
-            !allGranted && styles.buttonDisabled,
-            pressed && allGranted && { opacity: 0.85 },
+            !requiredPermissionsGranted && styles.buttonDisabled,
+            pressed && requiredPermissionsGranted && { opacity: 0.85 },
           ]}
           onPress={handleContinue}
         >

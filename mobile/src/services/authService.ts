@@ -1,63 +1,52 @@
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import { GoogleAuthProvider, signInWithCredential, User, signOut, signInAnonymously } from 'firebase/auth';
 import { auth } from './firebase';
 import { AuthResponse } from '@/features/auth/types/auth.types';
+import { GoogleSignin, statusCodes, isSuccessResponse } from '@react-native-google-signin/google-signin';
 
 // Module-level cache for holding verificationId during OTP flow
 let tempVerificationId: string | null = null;
 
-// Required for expo-auth-session to properly close the browser on redirect
-WebBrowser.maybeCompleteAuthSession();
+if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
+  console.warn('[GoogleAuth] EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not configured in .env');
+} else {
+  GoogleSignin.configure({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
+}
 
 /**
- * VaultGov — Google OAuth hook
- *
- * Uses the WEB Client ID for Expo Go compatibility.
- * When migrating to a standalone/bare build, add `androidClientId`
- * and `iosClientId` from the Google Cloud Console as well.
+ * VaultGov — Google OAuth hook (Native version)
  */
 export const useGoogleAuth = () => {
-  const [request, , promptAsync] = Google.useAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-  });
-
   /**
-   * Opens the Google OAuth browser popup and signs in to Firebase.
+   * Opens the Google Sign-In native dialog and signs in to Firebase.
    * Returns the authenticated Firebase User on success, null on cancel/failure.
    */
   const signIn = async (): Promise<User | null> => {
-    console.log('[GoogleAuth] Initiating Google OAuth prompt...');
+    console.log('[GoogleAuth] Initiating native Google Sign-In...');
 
-    let result;
-    try {
-      result = await promptAsync();
-    } catch (promptError) {
-      console.error('[GoogleAuth] promptAsync failed:', promptError);
-      return null;
-    }
-
-    if (result?.type === 'cancel' || result?.type === 'dismiss') {
-      console.log('[GoogleAuth] User cancelled the OAuth flow.');
-      return null;
-    }
-
-    if (result?.type !== 'success') {
-      console.warn('[GoogleAuth] OAuth did not succeed. Result type:', result?.type);
-      return null;
-    }
-
-    const { authentication } = result;
-
-    if (!authentication?.idToken) {
-      console.error('[GoogleAuth] No idToken received from Google OAuth.');
+    if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
+      console.error('[GoogleAuth] EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not configured.');
       return null;
     }
 
     try {
-      console.log('[GoogleAuth] Exchanging OAuth token for Firebase credential...');
-      const credential = GoogleAuthProvider.credential(authentication.idToken);
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const signInResult = await GoogleSignin.signIn();
+
+      if (!isSuccessResponse(signInResult)) {
+        console.log('[GoogleAuth] Google Sign-In was cancelled or did not succeed.');
+        return null;
+      }
+
+      const idToken = signInResult.data.idToken;
+      if (!idToken) {
+        console.error('[GoogleAuth] No idToken received from native Google Sign-In.');
+        return null;
+      }
+
+      console.log('[GoogleAuth] Exchanging native Google token for Firebase credential...');
+      const credential = GoogleAuthProvider.credential(idToken);
       const userCredential = await signInWithCredential(auth, credential);
       const firebaseUser = userCredential.user;
 
@@ -70,16 +59,24 @@ export const useGoogleAuth = () => {
       });
 
       return firebaseUser;
-    } catch (firebaseError) {
-      console.error('[GoogleAuth] Firebase signInWithCredential failed:', firebaseError);
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        console.log('[GoogleAuth] User cancelled the Google Sign-In flow.');
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        console.log('[GoogleAuth] Google Sign-In is already in progress.');
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        console.error('[GoogleAuth] Play Services are not available or outdated.');
+      } else {
+        console.error('[GoogleAuth] Native Google Sign-In failed with error:', error);
+      }
       return null;
     }
   };
 
   return {
-    /** Pass to the Google button's `disabled` prop — null means not yet ready */
-    request,
-    /** Call this to open the Google Sign-In popup */
+    /** Pass to the Google button's `disabled` prop — dummy object to enable it */
+    request: {},
+    /** Call this to open the Google Sign-In native dialog */
     signIn,
   };
 };

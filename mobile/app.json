@@ -44,7 +44,19 @@
           }
         }
       ],
-      "expo-image"
+      "expo-image",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow VaultGov to access your photos to select document images.",
+          "savePhotosPermission": "Allow VaultGov to save photos.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
