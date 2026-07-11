@@ -30,6 +30,8 @@ import { onAuthStateChanged, signOut as firebaseSignOut, User as FirebaseUser } 
 import { auth } from '@/services/firebase';
 import { apiClient, VaultGovUser } from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,16 +113,35 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = useCallback(async () => {
     try {
+      console.log('Firebase Sign Out Started');
       await firebaseSignOut(auth);
+      console.log('Firebase Sign Out Complete');
     } catch (err) {
       console.error('[UserContext] signOut error:', err);
     } finally {
+      console.log('Google Sign Out Started');
+      try {
+        await GoogleSignin.signOut();
+        console.log('Google Sign Out Complete');
+      } catch (gErr) {
+        console.error('[UserContext] Google Sign Out Error:', gErr);
+      }
+
+      // Check current user states after logout
+      try {
+        const googleUser = GoogleSignin.getCurrentUser();
+        console.log('Google Current User After Logout:', googleUser);
+      } catch {
+        console.log('Google Current User After Logout: null');
+      }
+      console.log('Firebase Current User After Logout:', auth.currentUser);
+
       apiClient.clearAuthToken();
       setFirebaseUser(null);
       setUser(null);
       try {
         await AsyncStorage.removeItem('@vaultgov/auth_user');
-        console.log('[UserContext] AsyncStorage cleared auth_user session');
+        console.log('AsyncStorage Cleared');
       } catch (e) {
         console.error('[UserContext] Failed to clear AsyncStorage:', e);
       }

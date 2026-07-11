@@ -123,6 +123,7 @@ export default function AuthGateScreen() {
           // 1. Get a fresh ID token and inject into the API client
           console.log('[AuthGate] Calling fbUser.getIdToken()...');
           const idToken = await fbUser.getIdToken();
+          console.log('JWT Received');
           console.log('[AuthGate] getIdToken() succeeded, token prefix:', idToken ? idToken.substring(0, 15) : 'null');
           apiClient.setAuthToken(idToken);
 
@@ -157,6 +158,7 @@ export default function AuthGateScreen() {
           let dbUser;
           try {
             dbUser = await apiClient.getUser(fbUser.uid);
+            console.log('Backend Login Success');
             console.log('[AuthGate] apiClient.getUser success. DB User ID:', dbUser.id);
             console.log('[AuthGate] Firebase Phone:', fbUser.phoneNumber, 'Database Phone:', dbUser.mobile_number);
             console.log('[AuthGate] Firebase Email:', fbUser.email, 'Database Email:', dbUser.email);
@@ -170,6 +172,7 @@ export default function AuthGateScreen() {
                 mobile_number: fbUser.phoneNumber ?? null,
                 email: fbUser.email ?? null,
               });
+              console.log('Backend Login Success');
               console.log('[AuthGate] User Created. Firebase Phone:', fbUser.phoneNumber, 'Firebase Email:', fbUser.email);
             } else {
               throw err; // will be caught by outer catch block

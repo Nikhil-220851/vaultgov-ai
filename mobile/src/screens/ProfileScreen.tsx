@@ -87,6 +87,7 @@ export function ProfileScreen() {
       console.log('[ProfileScreen] User initiating sign out...');
       await signOut();
       router.replace('/login' as any);
+      console.log('Navigation Redirected');
     } catch (error) {
       console.error('[ProfileScreen] Sign out failed:', error);
       Alert.alert('Error', 'Failed to sign out. Please try again.');

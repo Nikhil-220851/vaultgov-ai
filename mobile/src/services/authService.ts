@@ -23,6 +23,7 @@ export const useGoogleAuth = () => {
    * Returns the authenticated Firebase User on success, null on cancel/failure.
    */
   const signIn = async (): Promise<User | null> => {
+    console.log('Google Sign-In Started');
     console.log('[GoogleAuth] Initiating native Google Sign-In...');
 
     if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
@@ -39,6 +40,7 @@ export const useGoogleAuth = () => {
         return null;
       }
 
+      console.log('Google Account Selected');
       const idToken = signInResult.data.idToken;
       if (!idToken) {
         console.error('[GoogleAuth] No idToken received from native Google Sign-In.');
@@ -47,8 +49,13 @@ export const useGoogleAuth = () => {
 
       console.log('[GoogleAuth] Exchanging native Google token for Firebase credential...');
       const credential = GoogleAuthProvider.credential(idToken);
+      console.log('Firebase Credential Created');
       const userCredential = await signInWithCredential(auth, credential);
       const firebaseUser = userCredential.user;
+
+      console.log('Firebase UID:', firebaseUser.uid);
+      console.log('Firebase Email:', firebaseUser.email);
+      console.log('Provider ID:', credential.providerId);
 
       console.log('[GoogleAuth] ✅ Firebase authentication successful!');
       console.log('[GoogleAuth] User:', {
@@ -127,8 +134,24 @@ export const AuthService = {
    * Signs out the currently authenticated Firebase user.
    */
   async signOut(): Promise<void> {
+    console.log('Firebase Sign Out Started');
     await signOut(auth);
-    console.log('[AuthService] Signed out successfully.');
+    console.log('Firebase Sign Out Complete');
+    console.log('Google Sign Out Started');
+    try {
+      await GoogleSignin.signOut();
+      console.log('Google Sign Out Complete');
+    } catch (gErr) {
+      console.error('[AuthService] Google Sign Out Error:', gErr);
+    }
+
+    try {
+      const googleUser = GoogleSignin.getCurrentUser();
+      console.log('Google Current User After Logout:', googleUser);
+    } catch {
+      console.log('Google Current User After Logout: null');
+    }
+    console.log('Firebase Current User After Logout:', auth.currentUser);
   },
 
   /**
