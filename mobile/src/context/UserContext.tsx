@@ -119,8 +119,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(null);
       setUser(null);
       try {
-        await AsyncStorage.clear();
-        console.log('[UserContext] AsyncStorage cleared');
+        await AsyncStorage.removeItem('@vaultgov/auth_user');
+        console.log('[UserContext] AsyncStorage cleared auth_user session');
       } catch (e) {
         console.error('[UserContext] Failed to clear AsyncStorage:', e);
       }

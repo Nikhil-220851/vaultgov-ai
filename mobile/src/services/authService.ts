@@ -1,6 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { GoogleAuthProvider, signInWithCredential, User, signOut, signInAnonymously } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, User, signOut, PhoneAuthProvider } from 'firebase/auth';
 import { auth } from './firebase';
 import { AuthResponse } from '@/features/auth/types/auth.types';
 
@@ -19,7 +19,7 @@ WebBrowser.maybeCompleteAuthSession();
  */
 export const useGoogleAuth = () => {
   const [request, , promptAsync] = Google.useAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
   });
 
@@ -135,42 +135,126 @@ export const AuthService = {
   },
 
   /**
-   * [DEV MODE] Simulates sending an OTP SMS.
+   * Initiates authentication using OTP via real Firebase Phone Auth.
    *
-   * Firebase JS SDK phone auth requires native modules (google-services.json +
-   * @react-native-firebase/auth) which are unavailable in Expo Go. This mock
-   * bypasses PhoneAuthProvider entirely and simulates the full OTP flow so the
-   * UI can be tested end-to-end. Replace with real PhoneAuthProvider when
-   * migrating to a bare/managed build with native Firebase configuration.
+   * @param phoneNumber Formatted E.164 phone number, e.g. +91XXXXXXXXXX
+   * @param recaptchaVerifier ApplicationVerifier instance (e.g. FirebaseRecaptchaVerifierModal)
    */
-  async sendOTP(phoneNumber: string, _recaptchaVerifier: any): Promise<{ success: boolean }> {
-    console.log('[AuthService] [DEV MOCK] Simulating OTP send to:', phoneNumber);
-    // Simulate a realistic network round-trip delay
-    await new Promise<void>((resolve) => setTimeout(resolve, 1200));
-    // Store a deterministic mock session token
-    tempVerificationId = `mock-session-${Date.now()}`;
-    console.log('[AuthService] [DEV MOCK] OTP "sent". Use any 6-digit code to verify.');
-    return { success: true };
+  async sendOTP(phoneNumber: string, recaptchaVerifier: any): Promise<{ success: boolean }> {
+    console.log('[AuthService] sendOTP started for phone:', phoneNumber);
+    if (!phoneNumber) {
+      throw new Error('Phone number is required.');
+    }
+    if (!recaptchaVerifier) {
+      throw new Error('reCAPTCHA verifier is required.');
+    }
+
+    try {
+      console.log('[AuthService] Creating PhoneAuthProvider...');
+      const provider = new PhoneAuthProvider(auth);
+
+      // Runtime Diagnostics
+      console.log('[AuthService] Runtime Diagnostics:', {
+        authInstance: auth ? 'Initialized' : 'Undefined',
+        providerInstance: provider ? 'Created' : 'Undefined',
+        providerType: provider?.providerId || 'Unknown',
+        recaptchaVerifier: recaptchaVerifier ? {
+          type: recaptchaVerifier.type,
+          hasVerify: typeof recaptchaVerifier.verify === 'function',
+          hasReset: typeof recaptchaVerifier._reset === 'function',
+        } : 'Null/Undefined',
+        firebaseConfig: auth?.app?.options ? {
+          apiKey: auth.app.options.apiKey ? 'Present' : 'Missing',
+          authDomain: auth.app.options.authDomain ? 'Present' : 'Missing',
+          projectId: auth.app.options.projectId ? 'Present' : 'Missing',
+          appId: auth.app.options.appId ? 'Present' : 'Missing',
+        } : 'Undefined',
+      });
+
+      console.log('[AuthService] Calling verifyPhoneNumber with verifier...');
+      const verificationId = await provider.verifyPhoneNumber(phoneNumber, recaptchaVerifier);
+      
+      console.log('[AuthService] verifyPhoneNumber succeeded. Verification ID received:', verificationId);
+      tempVerificationId = verificationId;
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('[AuthService] sendOTP failed with error:', err);
+      throw err;
+    }
   },
 
   /**
-   * [DEV MODE] Verifies the entered OTP code.
+   * Verifies the entered OTP code against the stored verification ID.
+   * Authenticates the user in Firebase via Phone Authentication.
    *
-   * Accepts any 6-digit numeric code and signs the user in anonymously via
-   * Firebase so a real Firebase User object is returned to the rest of the app.
+   * @param otpCode 6-digit numeric OTP code entered by the user
    */
   async verifyOTP(otpCode: string): Promise<User> {
+    console.log('[AuthService] verifyOTP started. Entered code length:', otpCode?.length);
     if (!tempVerificationId) {
+      console.error('[AuthService] verifyOTP error: tempVerificationId is null');
       throw new Error('No active verification session found. Please request a new OTP code.');
     }
     if (!/^\d{6}$/.test(otpCode)) {
       throw new Error('Invalid OTP. Please enter the 6-digit code.');
     }
-    console.log('[AuthService] [DEV MOCK] OTP accepted. Signing in anonymously...');
-    tempVerificationId = null;
-    // Sign in anonymously so the app receives a genuine Firebase User object
-    const userCredential = await signInAnonymously(auth);
-    console.log('[AuthService] [DEV MOCK] ✅ Signed in as anonymous user:', userCredential.user.uid);
-    return userCredential.user;
+
+    try {
+      console.log('[AuthService] Building PhoneAuthProvider credential...');
+      const credential = PhoneAuthProvider.credential(tempVerificationId, otpCode);
+
+      console.log('[AuthService] Calling signInWithCredential...');
+      const userCredential = await signInWithCredential(auth, credential);
+      const firebaseUser = userCredential.user;
+
+      console.log('[AuthService] ✅ Real Firebase Phone Auth Sign-In Successful!');
+      console.log('[AuthService] Firebase UID:', firebaseUser.uid);
+      console.log('[AuthService] Firebase Phone Number:', firebaseUser.phoneNumber);
+      console.log('[AuthService] Firebase ProviderData:', JSON.stringify(firebaseUser.providerData, null, 2));
+
+      // Clear the temp session cache on success
+      tempVerificationId = null;
+      return firebaseUser;
+    } catch (err: any) {
+      console.error('[AuthService] verifyOTP failed with error:', err);
+      throw err;
+    }
   }
+};
+
+/**
+ * Translates Firebase Authentication error codes to clear, human-friendly messages.
+ */
+export const getReadableAuthError = (err: any): string => {
+  if (!err) return 'An unknown authentication error occurred.';
+  const code = err.code || (err.message && err.message.includes('auth/') ? err.message : null);
+  
+  if (!code) {
+    return err.message || 'Authentication failed. Please try again.';
+  }
+
+  if (code.includes('auth/invalid-phone-number')) {
+    return 'Invalid phone number format. Please check and try again.';
+  }
+  if (code.includes('auth/too-many-requests')) {
+    return 'Too many requests. SMS verification has been temporarily blocked for this phone number. Please try again later.';
+  }
+  if (code.includes('auth/invalid-app-credential') || code.includes('auth/app-not-authorized')) {
+    return 'App verification failed. Please verify that Google Play Services and safety check signatures are configured properly.';
+  }
+  if (code.includes('auth/invalid-verification-code')) {
+    return 'Invalid OTP code. Please check the SMS and enter the 6-digit code again.';
+  }
+  if (code.includes('auth/code-expired')) {
+    return 'The OTP verification code has expired. Please request a new OTP.';
+  }
+  if (code.includes('auth/operation-not-allowed')) {
+    return 'Phone authentication is not enabled in Firebase Console.';
+  }
+  if (code.includes('auth/quota-exceeded')) {
+    return 'SMS quota exceeded. Please try again later.';
+  }
+  
+  return err.message || 'Authentication failed. Please try again.';
 };

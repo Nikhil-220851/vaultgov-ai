@@ -75,6 +75,8 @@ export interface UserProfilePayload {
   district: string;
   occupation: string;
   annual_income: string;
+  mobile_number?: string | null;
+  email?: string | null;
 }
 
 export interface UserPermissionsPayload {

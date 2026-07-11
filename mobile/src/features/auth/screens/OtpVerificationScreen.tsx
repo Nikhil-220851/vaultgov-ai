@@ -17,7 +17,7 @@ import { AppLogo } from '@/components/AppLogo';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { FirebaseRecaptchaVerifierModal } from '@/components/FirebaseRecaptchaVerifierModal';
 import app from '@/services/firebase';
-import { AuthService } from '@/services/authService';
+import { AuthService, getReadableAuthError } from '@/services/authService';
 import { usePostAuthRedirect } from '@/hooks/usePostAuthRedirect';
 import { styles } from '../styles/auth.styles';
 
@@ -134,7 +134,7 @@ export function OtpVerificationScreen() {
       bannerOpacity.setValue(1);
     } catch (err: any) {
       console.error('[OtpVerificationScreen] resend failed:', err);
-      setError(err.message || 'Failed to resend OTP. Please try again.');
+      setError(getReadableAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -156,15 +156,7 @@ export function OtpVerificationScreen() {
       await postAuthRedirect(user);
     } catch (err: any) {
       console.error('[OtpVerificationScreen] verifyOTP failed:', err);
-      if (err.code === 'auth/invalid-verification-code') {
-        setError('Invalid OTP code. Please check the code and try again.');
-      } else if (err.code === 'auth/code-expired') {
-        setError('The OTP code has expired. Please request a new code.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many requests. Please try again later.');
-      } else {
-        setError(err.message || 'Verification failed. Please try again.');
-      }
+      setError(getReadableAuthError(err));
     } finally {
       setLoading(false);
     }

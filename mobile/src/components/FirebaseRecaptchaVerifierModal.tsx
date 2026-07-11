@@ -89,6 +89,11 @@ export class FirebaseRecaptchaVerifierModal extends React.Component<
     this.setState({ visible: false });
   };
 
+  _reset = () => {
+    // Firebase JS SDK calls this to reset the verifier state after execution.
+    // In our simulated mock modal, we keep it as a safe no-op.
+  };
+
   render() {
     const { visible, statusText, isComplete } = this.state;
     const { title = 'Security Verification' } = this.props;

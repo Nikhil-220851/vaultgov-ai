@@ -17,7 +17,7 @@ import { AppLogo } from '@/components/AppLogo';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { FirebaseRecaptchaVerifierModal } from '@/components/FirebaseRecaptchaVerifierModal';
 import app from '@/services/firebase';
-import { AuthService } from '@/services/authService';
+import { AuthService, getReadableAuthError } from '@/services/authService';
 import { styles } from '../styles/auth.styles';
 
 export function MobileNumberScreen() {
@@ -77,14 +77,7 @@ export function MobileNumberScreen() {
       });
     } catch (err: any) {
       console.error('[MobileNumberScreen] handleSendOtp failed:', err);
-      // Catch and display Firebase-specific authentication errors
-      if (err.code === 'auth/invalid-phone-number') {
-        setError('Invalid phone number format. Please check and try again.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many requests. Please try again later.');
-      } else {
-        setError(err.message || 'Failed to send OTP. Please try again.');
-      }
+      setError(getReadableAuthError(err));
     } finally {
       setLoading(false);
     }

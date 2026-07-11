@@ -63,12 +63,23 @@ function isNetworkError(err: any): boolean {
 
 export default function AuthGateScreen() {
   const router = useRouter();
-  const { setUser } = useUser();
+  const { user, setUser } = useUser();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
 
   // ── Permission helper ─────────────────────────────────────────────────────
   // (Removed checkPermissions as it was redundant with DB state check)
+
+  // ── Route Hydration Effect ────────────────────────────────────────────────
+  useEffect(() => {
+    if (pendingRoute && user) {
+      console.log('Final Route:', pendingRoute);
+      router.replace(pendingRoute as any);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPendingRoute(null);
+    }
+  }, [pendingRoute, user, router]);
 
 
   // ── Core resolution logic (extracted so Retry can reuse it) ──────────────
@@ -146,7 +157,11 @@ export default function AuthGateScreen() {
           let dbUser;
           try {
             dbUser = await apiClient.getUser(fbUser.uid);
-            console.log('[AuthGate] apiClient.getUser success:', dbUser ? dbUser.id : 'null');
+            console.log('[AuthGate] apiClient.getUser success. DB User ID:', dbUser.id);
+            console.log('[AuthGate] Firebase Phone:', fbUser.phoneNumber, 'Database Phone:', dbUser.mobile_number);
+            console.log('[AuthGate] Firebase Email:', fbUser.email, 'Database Email:', dbUser.email);
+            
+            // User already exists, we do NOT sync or overwrite it here.
           } catch (err: any) {
             if (err instanceof ApiError && err.status === 404) {
               console.log('[AuthGate] User not in Neon (404) → Automatically creating minimal user record.');
@@ -155,27 +170,48 @@ export default function AuthGateScreen() {
                 mobile_number: fbUser.phoneNumber ?? null,
                 email: fbUser.email ?? null,
               });
+              console.log('[AuthGate] User Created. Firebase Phone:', fbUser.phoneNumber, 'Firebase Email:', fbUser.email);
             } else {
               throw err; // will be caught by outer catch block
             }
           }
           
+          console.log('========== AUTH DEBUG ==========');
+          console.log('Firebase UID:', fbUser.uid);
+          console.log('Firebase Phone:', fbUser.phoneNumber);
+          console.log('Firebase Email:', fbUser.email);
+          console.log('Firebase ProviderData:', JSON.stringify(fbUser.providerData, null, 2));
+          console.log('');
+          console.log('Database User Found:', !!dbUser);
+          console.log('Database Firebase UID:', dbUser?.firebase_uid || dbUser?.id);
+          console.log('Database Phone:', dbUser?.mobile_number);
+          console.log('Database Email:', dbUser?.email);
+          console.log('Profile Completed:', dbUser?.profile_completed);
+          console.log('Permissions Seen:', dbUser?.onboarding_permissions_seen);
+          console.log('');
+          console.log('UserContext Before:', user);
+          
           setUser(dbUser);
+          
+          console.log('UserContext After:', dbUser);
+          console.log('========== END AUTH DEBUG ==========');
 
           console.log('[AuthGate] Profile fetched:', {
             profile_completed: dbUser.profile_completed,
+            mobile_number: dbUser.mobile_number,
+            email: dbUser.email
           });
 
           // 3. Route based on profile + permissions state
           if (!dbUser.profile_completed) {
             console.log('[AuthGate] Profile incomplete → Complete Profile.');
-            router.replace('/complete-profile' as any);
+            setPendingRoute('/complete-profile');
           } else if (!dbUser.onboarding_permissions_seen) {
             console.log('[AuthGate] Permissions missing → Grant Permissions.');
-            router.replace('/grant-permissions' as any);
+            setPendingRoute('/grant-permissions');
           } else {
             console.log('[AuthGate] All steps complete → Home.');
-            router.replace('/(tabs)/home' as any);
+            setPendingRoute('/(tabs)/home');
           }
         } catch (err: any) {
           console.log('[AuthGate] resolveSession caught error:', err);
@@ -197,7 +233,7 @@ export default function AuthGateScreen() {
         resolve();
       });
     });
-  }, [router, setUser]);
+  }, [router, setUser, user]);
 
   // ── Retry handler ─────────────────────────────────────────────────────────
 

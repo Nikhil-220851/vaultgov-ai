@@ -42,16 +42,18 @@ const INCOME_SLABS = [
 
 export function CompleteProfileScreen() {
   const router = useRouter();
-  const { firebaseUser, setUser } = useUser();
+  const { user, firebaseUser, setUser } = useUser();
 
   // Form State
-  const [fullName, setFullName] = useState('');
-  const [dob, setDob] = useState('');
-  const [gender, setGender] = useState('Male');
-  const [state, setState] = useState('');
-  const [district, setDistrict] = useState('');
-  const [occupation, setOccupation] = useState('');
-  const [annualIncome, setAnnualIncome] = useState('EWS');
+  const [fullName, setFullName] = useState(user?.full_name || '');
+  const [mobileNumber, setMobileNumber] = useState(user?.mobile_number || firebaseUser?.phoneNumber || '');
+  const [email, setEmail] = useState(user?.email || firebaseUser?.email || '');
+  const [dob, setDob] = useState(user?.date_of_birth || '');
+  const [gender, setGender] = useState(user?.gender || 'Male');
+  const [state, setState] = useState(user?.state || '');
+  const [district, setDistrict] = useState(user?.district || '');
+  const [occupation, setOccupation] = useState(user?.occupation || '');
+  const [annualIncome, setAnnualIncome] = useState(user?.annual_income || 'EWS');
 
   // Control State
   const [stateModalVisible, setStateModalVisible] = useState(false);
@@ -63,6 +65,17 @@ export function CompleteProfileScreen() {
 
   const validateForm = () => {
     if (!fullName.trim()) return 'Full Name is required';
+    
+    if (email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) return 'Please enter a valid email address';
+    }
+    
+    if (mobileNumber.trim()) {
+      const digits = mobileNumber.replace(/\D/g, '');
+      if (digits.length > 0 && digits.length < 10) return 'Please enter a valid mobile number';
+    }
+
     if (!dob.trim()) return 'Date of Birth is required';
     
     // Simple date validation YYYY-MM-DD
@@ -102,10 +115,18 @@ export function CompleteProfileScreen() {
       }
 
       console.log('[CompleteProfile] Submitting profile update to backend...');
+      console.log('[CompleteProfile] Firebase Phone:', firebaseUser?.phoneNumber);
+      console.log('[CompleteProfile] Firebase Email:', firebaseUser?.email);
+      console.log('[CompleteProfile] Database Phone:', user?.mobile_number);
+      console.log('[CompleteProfile] Database Email:', user?.email);
+      console.log('[CompleteProfile] Displayed Phone:', mobileNumber);
+      console.log('[CompleteProfile] Displayed Email:', email);
 
       // Save the complete-profile form data
       const updatedUser = await apiClient.updateUserProfile(uid, {
         full_name: fullName.trim(),
+        mobile_number: mobileNumber.trim() || null,
+        email: email.trim() || null,
         date_of_birth: dob,
         gender,
         state,
@@ -113,6 +134,10 @@ export function CompleteProfileScreen() {
         occupation: occupation.trim(),
         annual_income: annualIncome,
       });
+
+      console.log('[CompleteProfile] Saved Phone:', updatedUser.mobile_number);
+      console.log('[CompleteProfile] Saved Email:', updatedUser.email);
+      console.log('[CompleteProfile] Profile Updated Successfully');
 
       // Update the user context with the new profile state
       setUser(updatedUser);
@@ -190,6 +215,8 @@ export function CompleteProfileScreen() {
                 </View>
               )}
 
+              {/* Auth details replaced by editable fields */}
+
               {/* Full Name */}
               <Text style={styles.inputLabel}>Full Name (As in Aadhaar) *</Text>
               <View style={[styles.inputWrapper, focusedField === 'fullName' && styles.inputWrapperFocused]}>
@@ -204,6 +231,45 @@ export function CompleteProfileScreen() {
                     if (error) setError(null);
                   }}
                   onFocus={() => setFocusedField('fullName')}
+                  onBlur={() => setFocusedField(null)}
+                />
+              </View>
+
+              {/* Mobile Number */}
+              <Text style={styles.inputLabel}>Mobile Number (Optional)</Text>
+              <View style={[styles.inputWrapper, focusedField === 'mobileNumber' && styles.inputWrapperFocused]}>
+                <Ionicons name="call-outline" size={20} color="#707070" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. +91 98765 43210"
+                  placeholderTextColor="#A0A0A0"
+                  value={mobileNumber}
+                  onChangeText={(val) => {
+                    setMobileNumber(val);
+                    if (error) setError(null);
+                  }}
+                  keyboardType="phone-pad"
+                  onFocus={() => setFocusedField('mobileNumber')}
+                  onBlur={() => setFocusedField(null)}
+                />
+              </View>
+
+              {/* Email */}
+              <Text style={styles.inputLabel}>Email Address (Optional)</Text>
+              <View style={[styles.inputWrapper, focusedField === 'email' && styles.inputWrapperFocused]}>
+                <Ionicons name="mail-outline" size={20} color="#707070" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. arjun@example.com"
+                  placeholderTextColor="#A0A0A0"
+                  value={email}
+                  onChangeText={(val) => {
+                    setEmail(val);
+                    if (error) setError(null);
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  onFocus={() => setFocusedField('email')}
                   onBlur={() => setFocusedField(null)}
                 />
               </View>
@@ -631,6 +697,52 @@ const styles = StyleSheet.create({
   stateItemTextSelected: {
     color: '#1977F3',
     fontWeight: Typography.weights.bold,
+  },
+  authDetailsContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: Radius.md,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7F0',
+  },
+  authDetailsTitle: {
+    fontFamily: Typography.fontFamilies.heading,
+    fontSize: 12,
+    fontWeight: Typography.weights.bold,
+    color: '#707070',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  authField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  authIcon: {
+    marginRight: 8,
+  },
+  authText: {
+    fontFamily: Typography.fontFamilies.sans,
+    fontSize: 14,
+    color: '#000000',
+    flex: 1,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  verifiedText: {
+    fontFamily: Typography.fontFamilies.sans,
+    fontSize: 10,
+    color: '#34C759',
+    fontWeight: Typography.weights.bold,
+    marginLeft: 4,
   },
 });
 

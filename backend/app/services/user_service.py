@@ -28,7 +28,20 @@ def get_or_create_user(
     user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
 
     if user:
+        updated = False
+        if mobile_number and not user.mobile_number:
+            user.mobile_number = mobile_number
+            updated = True
+        if email and not user.email:
+            user.email = email
+            updated = True
+            
+        if updated:
+            user.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(user)
         return user, False
+        
 
     user = User(
         firebase_uid=firebase_uid,
@@ -70,6 +83,13 @@ def update_user_profile(
     user.district = data.district
     user.occupation = data.occupation
     user.annual_income = data.annual_income
+    
+    # Save mobile number and email. 
+    # If the user explicitly clears the field (empty string on frontend),
+    # the schema validator converts it to None, which will be saved as NULL.
+    user.mobile_number = data.mobile_number
+    user.email = data.email
+
     user.profile_completed = True
     user.updated_at = datetime.now(timezone.utc)
 

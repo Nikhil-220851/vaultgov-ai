@@ -29,6 +29,28 @@ class UserProfileUpdate(BaseModel):
     district: str
     occupation: str
     annual_income: str
+    mobile_number: Optional[str] = None
+    email: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_if_present(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if v == "":
+                return None
+            if "@" not in v:
+                raise ValueError("Invalid email format")
+        return v
+
+    @field_validator("mobile_number")
+    @classmethod
+    def clean_mobile_number(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if v == "":
+                return None
+        return v
 
     @field_validator("full_name")
     @classmethod
