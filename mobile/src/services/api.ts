@@ -83,6 +83,37 @@ export interface UserPermissionsPayload {
   onboarding_permissions_seen: boolean;
 }
 
+export interface VaultGovDocument {
+  id: string;
+  user_id: string;
+  title: string;
+  category: string | null;
+  tags: string[];
+  extracted_text: string | null;
+  image_uri: string | null;
+  source: string;
+  confidence_score: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentCreatePayload {
+  title: string;
+  category?: string | null;
+  tags?: string[];
+  extracted_text?: string | null;
+  image_uri?: string | null;
+  source?: string;
+  confidence_score?: number | null;
+}
+
+export interface VaultGovStats {
+  total_documents: number;
+  total_categories: number;
+  storage_used_bytes: number;
+  recent_uploads: VaultGovDocument[];
+}
+
 // ─── Internal state ───────────────────────────────────────────────────────────
 
 let _authToken: string | null = null;
@@ -299,5 +330,68 @@ export const apiClient = {
       }
     );
     return handleResponse<VaultGovUser>(response);
+  },
+
+  /**
+   * GET /api/v1/documents
+   * Fetch all documents for the authenticated user.
+   */
+  async getDocuments(): Promise<VaultGovDocument[]> {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/documents/`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse<VaultGovDocument[]>(response);
+  },
+
+  /**
+   * GET /api/v1/documents/:id
+   * Fetch a single document by ID.
+   */
+  async getDocument(id: string): Promise<VaultGovDocument> {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/documents/${id}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse<VaultGovDocument>(response);
+  },
+
+  /**
+   * POST /api/v1/documents
+   * Create a new document.
+   */
+  async createDocument(payload: DocumentCreatePayload): Promise<VaultGovDocument> {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/documents/`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<VaultGovDocument>(response);
+  },
+
+  /**
+   * DELETE /api/v1/documents/:id
+   * Delete a document.
+   */
+  async deleteDocument(id: string): Promise<void> {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/documents/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status, 'Failed to delete document');
+    }
+  },
+
+  /**
+   * GET /api/v1/stats
+   * Fetch user dashboard stats.
+   */
+  async getStats(): Promise<VaultGovStats> {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/stats/`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse<VaultGovStats>(response);
   },
 };

@@ -10,7 +10,7 @@ import {
   DocumentStoreContext,
   useDocumentStoreInternal,
 } from './useDocumentStore';
-import { DocumentItem } from '../documents.types';
+import { VaultGovDocument } from '@/services/api';
 
 interface DocumentStoreProviderProps {
   children: React.ReactNode;
@@ -19,10 +19,14 @@ interface DocumentStoreProviderProps {
 export const DocumentStoreProvider: React.FC<DocumentStoreProviderProps> = ({
   children,
 }) => {
-  const { state, dispatch } = useDocumentStoreInternal();
+  const { state, dispatch, fetchDocuments } = useDocumentStoreInternal();
 
-  const addDocument = (doc: DocumentItem) => {
+  const addDocument = (doc: VaultGovDocument) => {
     dispatch({ type: 'ADD_DOCUMENT', payload: doc });
+  };
+
+  const deleteDocument = (id: string) => {
+    dispatch({ type: 'DELETE_DOCUMENT', payload: id });
   };
 
   return (
@@ -31,6 +35,8 @@ export const DocumentStoreProvider: React.FC<DocumentStoreProviderProps> = ({
         documents: state.documents,
         isHydrating: state.isHydrating,
         addDocument,
+        deleteDocument,
+        fetchDocuments,
       }}
     >
       {children}

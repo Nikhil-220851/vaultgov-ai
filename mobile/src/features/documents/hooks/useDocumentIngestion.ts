@@ -8,7 +8,7 @@
  *  - Manages OCRStatus lifecycle (idle → processing → success/partial/failed).
  *  - Exposes editable fields and updateField() for user corrections.
  *  - Retake: re-opens the correct picker (camera / gallery / pdf) and resets state.
- *  - saveDocument: validates required fields, builds DocumentItem, calls addDocument(),
+ *  - saveDocument: validates required fields, builds API payload, calls apiClient.createDocument(),
  *    then navigates to the Docs tab using router.replace (not push) so pressing
  *    Back from Docs does not reopen the completed preview screen.
  *  - isSaving guard prevents double-tap.
@@ -22,7 +22,7 @@ import { OCRStatus, ExtractedField } from '../services/ocr.service';
 import { devOCRAdapter } from '../services/ocr.dev-adapter';
 import { mapDocumentTypeToCategory, mapCategoryFieldToCategory } from '../services/document-category.mapper';
 import { useDocumentStore } from '../store/useDocumentStore';
-import { DocumentItem, VisualState } from '../documents.types';
+import { apiClient } from '@/services/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,63 +53,33 @@ function allRequiredFieldsFilled(fields: ExtractedField[]): boolean {
 
 // ─── Build DocumentItem from extracted fields ─────────────────────────────────
 
-function buildDocumentItem(
+function buildDocumentPayload(
   fields: ExtractedField[],
   assetUri: string,
-): DocumentItem {
+) {
   const getValue = (key: string) =>
     fields.find((f) => f.key === key)?.value ?? null;
 
   const docType = getValue('documentType') ?? 'Document';
-  const name = getValue('name');
   const categoryField = getValue('category');
 
-  // Derive category from the 'category' field first, then from document type
   const category = categoryField
     ? mapCategoryFieldToCategory(categoryField)
     : mapDocumentTypeToCategory(docType);
 
-  // Build subtitle from available identifiers
-  const identifierField = fields.find(
-    (f) =>
-      f.key === 'licenseNumber' ||
-      f.key === 'aadhaarNumber' ||
-      f.key === 'panNumber' ||
-      f.key === 'passportNumber' ||
-      f.key === 'certificateNumber' ||
-      f.key === 'rollNumber',
-  );
-  const identifier = identifierField?.value;
-  const subtitle =
-    [identifier, name].filter(Boolean).join(' · ') || 'Added document';
-
-  // Expiry info
-  const expiryDate = getValue('expiryDate');
-  const expiryText = expiryDate ?? 'Valid';
-
-  // Determine visual state based on expiry
-  const state: VisualState = 'info';
-
-  // Derive icon from category
-  const iconMap: Record<string, string> = {
-    'Govt IDs': 'card-outline',
-    Certificates: 'document-text-outline',
-    Education: 'school-outline',
-    Other: 'document-outline',
-  };
+  const extractedText = fields.map(f => `${f.label}: ${f.value}`).join('\n');
 
   return {
-    id: `doc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     title: docType,
-    subtitle,
-    expiryText,
     category,
-    state,
-    iconName: iconMap[category] ?? 'document-outline',
-    savedAt: new Date().toISOString(),
-    assetUri,
+    image_uri: assetUri,
+    source: assetUri.includes('camera') ? 'camera' : 'upload',
+    extracted_text: extractedText,
+    tags: [docType],
+    confidence_score: 0.9,
   };
 }
+
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -118,7 +88,7 @@ export function useDocumentIngestion(
   onAssetChanged?: (file: SelectedFile) => void,
 ): UseDocumentIngestionReturn {
   const router = useRouter();
-  const { addDocument } = useDocumentStore();
+  const { fetchDocuments } = useDocumentStore();
 
   const [file, setFile] = useState<SelectedFile | null>(initialFile);
   const [ocrStatus, setOcrStatus] = useState<OCRStatus>('idle');
@@ -208,8 +178,9 @@ export function useDocumentIngestion(
 
     setIsSaving(true);
     try {
-      const doc = buildDocumentItem(fields, file.uri);
-      addDocument(doc);
+      const payload = buildDocumentPayload(fields, file.uri);
+      await apiClient.createDocument(payload);
+      await fetchDocuments();
 
       // Use replace so Back from Docs does not reopen the preview screen
       router.replace('/(tabs)/docs' as any);
@@ -221,7 +192,7 @@ export function useDocumentIngestion(
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, fields, file, addDocument, router]);
+  }, [isSaving, fields, file, fetchDocuments, router]);
 
   const canSave = allRequiredFieldsFilled(fields);
 

@@ -80,24 +80,7 @@ export interface AppliedScheme {
   submittedAt: string;
 }
 
-// ─── Mock User Profile ────────────────────────────────────────────────────────
 
-export const mockUserProfile = {
-  name: 'Arjun Mehta',
-  mobile: '+91 98765 43210',
-  age: 28,
-  annualIncome: 280000,
-  state: 'Maharashtra',
-  education: 'Graduate',
-  occupation: 'Self-Employed',
-  gender: 'Male',
-  hasExistingHouse: false,
-  isFarmer: false,
-  isStudying: false,
-  category: 'General',
-  aadhaarLinked: true,
-  panLinked: true,
-};
 
 // ─── Scheme Data ──────────────────────────────────────────────────────────────
 

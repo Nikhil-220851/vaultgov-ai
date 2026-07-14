@@ -4,17 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { auth } from '@/services/firebase';
 import { Colors } from '@/theme';
-import { MOCK_USER } from '@/features/home/constants';
-import { CategoryType } from './documents.constants';
+import { CategoryFilter, CategoryType } from './components/CategoryFilter';
 import { DocumentCard } from './components/DocumentCard';
 import { DocumentSearchBar } from './components/DocumentSearchBar';
-import { CategoryFilter } from './components/CategoryFilter';
 import { AddDocumentButton } from './components/AddDocumentButton';
 import { UploadDocumentSheet } from './components/UploadDocumentSheet';
 import { useDocumentStore } from './store/useDocumentStore';
 import {
-  captureWithCamera,
-  pickFromGallery,
   pickPdfDocument,
   SelectedFile,
 } from './upload.service';
@@ -28,12 +24,14 @@ export const DocumentsScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('All');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  // Pull logged-in user details if available, fallback to mock user
+  // Pull logged-in user details if available
   const user = auth.currentUser;
-  const displayName = user?.displayName || user?.phoneNumber || MOCK_USER.name;
+  const displayName = user?.displayName || user?.phoneNumber || 'User';
   const avatarInitials = displayName
     ? displayName.trim().charAt(0).toUpperCase()
-    : MOCK_USER.avatarInitials;
+    : 'U';
+
+  const uniqueCategories = Array.from(new Set(documents.map(d => d.category || 'Uncategorised')));
 
   const handleAvatarPress = () => {
     console.log('[DocumentsScreen] User profile avatar pressed');
@@ -60,12 +58,10 @@ export const DocumentsScreen: React.FC = () => {
 
   const handleTakePhoto = useCallback(async () => {
     setIsSheetOpen(false);
-    // Small delay so sheet closes before camera UI opens
-    setTimeout(async () => {
-      const file = await captureWithCamera();
-      if (file) handleFileSelected(file);
+    setTimeout(() => {
+      router.push('/scan/camera' as any);
     }, 300);
-  }, [handleFileSelected]);
+  }, [router]);
 
   const handleUploadPdf = useCallback(async () => {
     setIsSheetOpen(false);
@@ -77,22 +73,21 @@ export const DocumentsScreen: React.FC = () => {
 
   const handleUploadImage = useCallback(async () => {
     setIsSheetOpen(false);
-    setTimeout(async () => {
-      const file = await pickFromGallery();
-      if (file) handleFileSelected(file);
+    setTimeout(() => {
+      router.push('/scan' as any);
     }, 300);
-  }, [handleFileSelected]);
+  }, [router]);
 
   // ── Filtering ────────────────────────────────────────────────────────────
 
   const filteredDocuments = documents.filter((doc) => {
+    const docCategory = doc.category || 'Uncategorised';
     const matchesCategory =
-      selectedCategory === 'All' || doc.category === selectedCategory;
+      selectedCategory === 'All' || docCategory === selectedCategory;
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
       query === '' ||
-      doc.title.toLowerCase().includes(query) ||
-      doc.subtitle.toLowerCase().includes(query);
+      doc.title.toLowerCase().includes(query);
     return matchesCategory && matchesSearch;
   });
 
@@ -133,6 +128,7 @@ export const DocumentsScreen: React.FC = () => {
 
         {/* Category Scrollable Chips */}
         <CategoryFilter
+          categories={uniqueCategories}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />

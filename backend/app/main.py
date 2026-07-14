@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.users import router as users_router
+from app.api.documents import router as documents_router
+from app.api.stats import router as stats_router
 from app.core.firebase_admin import initialize_firebase
 from app.database.connection import test_connection
 
@@ -24,6 +26,8 @@ app.add_middleware(
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(documents_router, prefix="/api/v1")
+app.include_router(stats_router, prefix="/api/v1")
 
 
 # ─── Startup ──────────────────────────────────────────────────────────────────

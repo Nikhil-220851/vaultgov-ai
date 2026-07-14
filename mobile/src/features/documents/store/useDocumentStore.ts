@@ -4,11 +4,9 @@
  * Lightweight document state store built with React Context + useReducer.
  *
  * Hydration strategy:
- *  1. On mount, attempt to read persisted documents from AsyncStorage.
- *  2. If persisted data exists, use it (MOCK_DOCUMENTS is NOT applied).
- *  3. If no persisted data exists (first install), seed with MOCK_DOCUMENTS.
- *  4. Persistence to AsyncStorage is triggered only AFTER hydration completes,
- *     preventing accidental overwrite of stored docs on re-render.
+ *  1. On mount, fetch documents from the backend via apiClient.getDocuments().
+ *  2. State is stored in React Context — no AsyncStorage, no mock data.
+ *  3. Persistence is handled by the FastAPI backend (PostgreSQL).
  *
  * No external state library is required. All consumers use useDocumentStore().
  */
@@ -18,28 +16,23 @@ import {
   useContext,
   useReducer,
   useEffect,
-  useRef,
   Dispatch,
 } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DocumentItem } from '../documents.types';
-import { MOCK_DOCUMENTS } from '../documents.constants';
+import { apiClient, VaultGovDocument } from '@/services/api';
 
-// ─── Storage key ─────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = '@vaultgov/documents_v1';
 
 // ─── State & Actions ──────────────────────────────────────────────────────────
 
 export interface DocumentStoreState {
-  documents: DocumentItem[];
+  documents: VaultGovDocument[];
   /** True until the initial AsyncStorage read completes. */
   isHydrating: boolean;
 }
 
 export type DocumentStoreAction =
-  | { type: 'HYDRATE'; payload: DocumentItem[] }
-  | { type: 'ADD_DOCUMENT'; payload: DocumentItem };
+  | { type: 'HYDRATE'; payload: VaultGovDocument[] }
+  | { type: 'ADD_DOCUMENT'; payload: VaultGovDocument }
+  | { type: 'DELETE_DOCUMENT'; payload: string };
 
 function reducer(
   state: DocumentStoreState,
@@ -52,6 +45,11 @@ function reducer(
       return {
         ...state,
         documents: [action.payload, ...state.documents],
+      };
+    case 'DELETE_DOCUMENT':
+      return {
+        ...state,
+        documents: state.documents.filter(d => d.id !== action.payload),
       };
     default:
       return state;
@@ -66,9 +64,11 @@ const initialState: DocumentStoreState = {
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 interface DocumentStoreContextValue {
-  documents: DocumentItem[];
+  documents: VaultGovDocument[];
   isHydrating: boolean;
-  addDocument: (doc: DocumentItem) => void;
+  addDocument: (doc: VaultGovDocument) => void;
+  deleteDocument: (id: string) => void;
+  fetchDocuments: () => Promise<void>;
 }
 
 export const DocumentStoreContext = createContext<DocumentStoreContextValue>(null!);
@@ -83,66 +83,28 @@ export function useDocumentStore(): DocumentStoreContextValue {
   return ctx;
 }
 
-// ─── Persistence helpers ──────────────────────────────────────────────────────
-
-async function persistDocuments(docs: DocumentItem[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
-  } catch (err) {
-    console.warn('[DocumentStore] Failed to persist documents:', err);
-  }
-}
-
-async function loadDocuments(): Promise<DocumentItem[] | null> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DocumentItem[];
-    if (!Array.isArray(parsed)) return null;
-    return parsed;
-  } catch (err) {
-    console.warn('[DocumentStore] Failed to load persisted documents:', err);
-    return null;
-  }
-}
-
 // ─── Internal hook used by the Provider ──────────────────────────────────────
 
 export function useDocumentStoreInternal(): {
   state: DocumentStoreState;
   dispatch: Dispatch<DocumentStoreAction>;
+  fetchDocuments: () => Promise<void>;
 } {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Track whether hydration has completed so we never persist before it.
-  const hydratedRef = useRef(false);
+  const fetchDocuments = async () => {
+    try {
+      const docs = await apiClient.getDocuments();
+      dispatch({ type: 'HYDRATE', payload: docs });
+    } catch (err) {
+      console.warn('[DocumentStore] Failed to fetch documents:', err);
+      dispatch({ type: 'HYDRATE', payload: [] });
+    }
+  };
 
-  // ── Step 1: Hydrate from AsyncStorage on mount ────────────────────────────
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const persisted = await loadDocuments();
-      if (cancelled) return;
-
-      if (persisted !== null) {
-        // Use stored documents — do NOT fall back to seed data
-        dispatch({ type: 'HYDRATE', payload: persisted });
-      } else {
-        // First install: seed with mock data
-        dispatch({ type: 'HYDRATE', payload: MOCK_DOCUMENTS });
-      }
-      hydratedRef.current = true;
-    })();
-    return () => {
-      cancelled = true;
-    };
+    fetchDocuments();
   }, []);
 
-  // ── Step 2: Persist to AsyncStorage only AFTER hydration completes ────────
-  useEffect(() => {
-    if (!hydratedRef.current) return; // Skip pre-hydration renders
-    persistDocuments(state.documents);
-  }, [state.documents]);
-
-  return { state, dispatch };
+  return { state, dispatch, fetchDocuments };
 }

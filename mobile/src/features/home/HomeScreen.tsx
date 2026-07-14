@@ -1,32 +1,19 @@
 import React, { useState, useCallback } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { auth } from '@/services/firebase';
 import { useUser } from '@/context/UserContext';
 import { styles } from './styles';
-import {
-  MOCK_USER,
-  MOCK_DATE,
-  MOCK_HEALTH_SCORE,
-  MOCK_OVERVIEW,
-  MOCK_ALERTS,
-  MOCK_SCHEMES,
-  MOCK_QUICK_ACTIONS,
-} from './constants';
+import { apiClient, VaultGovStats } from '@/services/api';
 
 // Subcomponents — use named imports to satisfy import/no-named-as-default
 import { Header } from './components/Header';
 import { Greeting } from './components/Greeting';
-import { HealthScoreCard } from './components/HealthScoreCard';
 import { OverviewCard } from './components/OverviewCard';
-import { AlertDocumentCard } from './components/AlertDocumentCard';
-import { SchemeCard } from './components/SchemeCard';
 import { QuickActionCard } from './components/QuickActionCard';
 import { UploadDocumentSheet } from '@/features/documents/components/UploadDocumentSheet';
 import {
-  captureWithCamera,
-  pickFromGallery,
   pickPdfDocument,
   SelectedFile,
 } from '@/features/documents/upload.service';
@@ -35,11 +22,36 @@ export const HomeScreen: React.FC = () => {
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { user: dbUser } = useUser();
+  const [stats, setStats] = useState<VaultGovStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Pull logged-in user details if available, fallback to mock
-  const displayName = dbUser?.full_name || auth.currentUser?.displayName || auth.currentUser?.phoneNumber || MOCK_USER.name;
+  React.useEffect(() => {
+    async function loadStats() {
+      try {
+        const data = await apiClient.getStats();
+        setStats(data);
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStats();
+  }, []);
+
+  // Pull logged-in user details if available
+  const displayName = dbUser?.full_name || auth.currentUser?.displayName || auth.currentUser?.phoneNumber || 'User';
   // Get first letter of name for avatar
-  const avatarInitials = displayName ? displayName.trim().charAt(0).toUpperCase() : MOCK_USER.avatarInitials;
+  const avatarInitials = displayName ? displayName.trim().charAt(0).toUpperCase() : 'U';
+
+  const QUICK_ACTIONS = [
+    {
+      id: 'upload',
+      title: 'Upload document',
+      subtitle: 'Photo · PDF · Image',
+      iconName: 'cloud-upload-outline',
+    },
+  ];
 
 
   const handleAvatarPress = () => {
@@ -55,13 +67,7 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
-  const handleAlertPress = (id: string) => {
-    console.log('[HomeScreen] Attention needed card pressed:', id);
-  };
 
-  const handleSchemePress = (id: string) => {
-    console.log('[HomeScreen] Eligible scheme card pressed:', id);
-  };
 
   // ── Upload sheet handlers ──────────────────────────────────────────────────
 
@@ -80,11 +86,10 @@ export const HomeScreen: React.FC = () => {
 
   const handleTakePhoto = useCallback(async () => {
     setIsSheetOpen(false);
-    setTimeout(async () => {
-      const file = await captureWithCamera();
-      if (file) handleFileSelected(file);
+    setTimeout(() => {
+      router.push('/scan/camera' as any);
     }, 300);
-  }, [handleFileSelected]);
+  }, [router]);
 
   const handleUploadPdf = useCallback(async () => {
     setIsSheetOpen(false);
@@ -96,11 +101,10 @@ export const HomeScreen: React.FC = () => {
 
   const handleUploadImage = useCallback(async () => {
     setIsSheetOpen(false);
-    setTimeout(async () => {
-      const file = await pickFromGallery();
-      if (file) handleFileSelected(file);
+    setTimeout(() => {
+      router.push('/scan' as any);
     }, 300);
-  }, [handleFileSelected]);
+  }, [router]);
 
   const handleQuickActionPress = (id: string) => {
     console.log('[HomeScreen] Quick action card pressed:', id);
@@ -120,62 +124,55 @@ export const HomeScreen: React.FC = () => {
         <Header avatarInitials={avatarInitials} onPressAvatar={handleAvatarPress} />
 
         {/* Greeting */}
-        <Greeting userName={displayName} currentDate={MOCK_DATE} />
-
-        {/* Health Score Card */}
-        <HealthScoreCard data={MOCK_HEALTH_SCORE} />
+        <Greeting userName={displayName} currentDate={new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
 
         {/* Overview Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>OVERVIEW</Text>
         </View>
         <View style={styles.overviewGrid}>
-          {MOCK_OVERVIEW.map((item, index) => (
-            <OverviewCard
-              key={item.id}
-              item={item}
-              isFirst={index === 0}
-              isLast={index === MOCK_OVERVIEW.length - 1}
-              onPress={() => handleOverviewPress(item.id)}
-            />
-          ))}
+          <OverviewCard
+            item={{
+              id: 'docs',
+              label: 'Documents',
+              count: stats?.total_documents ?? 0,
+              iconName: 'document-text-outline',
+              type: 'neutral',
+            }}
+            isFirst={true}
+            isLast={false}
+            onPress={() => handleOverviewPress('docs')}
+          />
+          <OverviewCard
+            item={{
+              id: 'categories',
+              label: 'Categories',
+              count: stats?.total_categories ?? 0,
+              iconName: 'folder-outline',
+              type: 'success',
+            }}
+            isFirst={false}
+            isLast={true}
+            onPress={() => handleOverviewPress('docs')}
+          />
         </View>
 
-        {/* Attention Needed Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitleDark}>ATTENTION NEEDED</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/docs' as any)}>
-            <Text style={styles.seeAllText}>See all</Text>
-          </TouchableOpacity>
-        </View>
-        {MOCK_ALERTS.map((alert) => (
-          <AlertDocumentCard
-            key={alert.id}
-            item={alert}
-            onPress={() => handleAlertPress(alert.id)}
-          />
-        ))}
-
-        {/* Eligible Schemes Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitleDark}>ELIGIBLE SCHEMES</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/schemes' as any)}>
-            <Text style={styles.seeAllText}>View all</Text>
-          </TouchableOpacity>
-        </View>
-        {MOCK_SCHEMES.map((scheme) => (
-          <SchemeCard
-            key={scheme.id}
-            item={scheme}
-            onPress={() => handleSchemePress(scheme.id)}
-          />
-        ))}
+        {loading ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: '#aaa' }}>Loading dashboard...</Text>
+          </View>
+        ) : (!stats?.total_documents ? (
+          <View style={{ padding: 30, alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, marginHorizontal: 16, marginTop: 16 }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#333' }}>No documents yet</Text>
+            <Text style={{ fontSize: 14, color: '#777', marginTop: 4 }}>Scan your first document to get started</Text>
+          </View>
+        ) : null)}
 
         {/* Quick Actions Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitleDark}>QUICK ACTIONS</Text>
         </View>
-        {MOCK_QUICK_ACTIONS.map((action) => (
+        {QUICK_ACTIONS.map((action) => (
           <QuickActionCard
             key={action.id}
             item={action}

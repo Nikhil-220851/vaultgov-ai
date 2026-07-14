@@ -35,22 +35,7 @@ const STORAGE_KEYS = {
   applied: 'vaultgov_applied_schemes',
 };
 
-const MOCK_APPLIED: AppliedScheme[] = [
-  {
-    schemeId: 'scheme-003',
-    applicationId: 'VG-2026-004521',
-    applicationDate: 'Jul 1, 2026',
-    status: 'under_review',
-    submittedAt: 'Jul 1, 2026',
-  },
-  {
-    schemeId: 'scheme-005',
-    applicationId: 'VG-2026-003874',
-    applicationDate: 'Jun 18, 2026',
-    status: 'submitted',
-    submittedAt: 'Jun 18, 2026',
-  },
-];
+
 
 export function SchemeCentreScreen() {
   const router = useRouter();
@@ -59,7 +44,7 @@ export function SchemeCentreScreen() {
   const [filter, setFilter] = useState<SchemeFilter>(DEFAULT_FILTER);
   const [filterVisible, setFilterVisible] = useState(false);
   const [savedIds, setSavedIds] = useState<string[]>([]);
-  const [appliedSchemes, setAppliedSchemes] = useState<AppliedScheme[]>(MOCK_APPLIED);
+  const [appliedSchemes, setAppliedSchemes] = useState<AppliedScheme[]>([]);
 
   useEffect(() => {
     const loadSavedIds = async () => {
@@ -76,7 +61,7 @@ export function SchemeCentreScreen() {
         const stored = await AsyncStorage.getItem(STORAGE_KEYS.applied);
         if (stored) {
           const parsed = JSON.parse(stored) as AppliedScheme[];
-          setAppliedSchemes([...MOCK_APPLIED, ...parsed]);
+          setAppliedSchemes(parsed);
         }
       } catch {
         // silent fail

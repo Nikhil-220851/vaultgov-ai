@@ -1,0 +1,27 @@
+# render.yaml — Render deployment configuration for VaultGov AI backend.
+#
+# This file is the single source of truth for how Render builds and starts
+# the backend service. It ensures:
+#   1. Dependencies are installed from requirements.txt
+#   2. Alembic migrations run automatically before the server starts
+#   3. Uvicorn binds to Render's assigned $PORT
+
+services:
+  - type: web
+    name: vaultgov-backend
+    runtime: python
+    # Render looks for this file relative to the repository root.
+    # rootDir sets the working directory for build + start commands.
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Run migrations then start the server.
+    # alembic upgrade head is idempotent — safe to run on every deploy.
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # Set this secret in the Render dashboard
+      - key: FIREBASE_PROJECT_ID
+        sync: false          # Set this in the Render dashboard
+      - key: FIREBASE_CREDENTIALS_PATH
+        value: ./firebase-service-account.json

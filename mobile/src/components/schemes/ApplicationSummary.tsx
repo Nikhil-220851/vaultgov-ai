@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Scheme, mockUserProfile } from '@/data/schemes';
+import { Scheme } from '@/data/schemes';
+import { useUser } from '@/context/UserContext';
+import { auth } from '@/services/firebase';
 import { colors } from '@/theme/colors';
 import { Colors, Radius, Spacing, Typography } from '@/theme';
 
@@ -11,6 +13,10 @@ interface ApplicationSummaryProps {
 }
 
 export function ApplicationSummary({ scheme, applicationId }: ApplicationSummaryProps) {
+  const { user: dbUser } = useUser();
+  const displayName = dbUser?.full_name || auth.currentUser?.displayName || 'User';
+  const mobileNumber = auth.currentUser?.phoneNumber || 'Not provided';
+
   const readyDocs = scheme.requiredDocuments.filter(
     (d) => d.status === 'uploaded' || d.status === 'verified'
   );
@@ -40,12 +46,12 @@ export function ApplicationSummary({ scheme, applicationId }: ApplicationSummary
           <Text style={styles.cardTitle}>Applicant Details</Text>
         </View>
         <View style={styles.infoGrid}>
-          <InfoRow label="Full Name" value={mockUserProfile.name} />
-          <InfoRow label="Mobile Number" value={mockUserProfile.mobile} />
-          <InfoRow label="Age" value={`${mockUserProfile.age} years`} />
-          <InfoRow label="State" value={mockUserProfile.state} />
-          <InfoRow label="Education" value={mockUserProfile.education} />
-          <InfoRow label="Annual Income" value={`₹${mockUserProfile.annualIncome.toLocaleString('en-IN')}`} />
+          <InfoRow label="Full Name" value={displayName} />
+          <InfoRow label="Mobile Number" value={mobileNumber} />
+          <InfoRow label="Age" value={`N/A`} />
+          <InfoRow label="State" value={'N/A'} />
+          <InfoRow label="Education" value={'N/A'} />
+          <InfoRow label="Annual Income" value={`N/A`} />
         </View>
       </View>
 
