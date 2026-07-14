@@ -36,12 +36,22 @@ class Document(Base):
         index=True,
     )
     title = Column(String(255), nullable=False)
+    subtitle = Column(String(255), nullable=True)
+    expiry_text = Column(String(100), nullable=True)
     category = Column(String(100), nullable=True)
+    visual_state = Column(String(50), nullable=True)
+    icon_name = Column(String(100), nullable=True)
+    asset_uri = Column(String, nullable=True)
     tags = Column(JSONB, nullable=False, default=list)
     extracted_text = Column(String, nullable=True)
     image_uri = Column(String, nullable=True)
     source = Column(String(50), nullable=False, default="camera")
     confidence_score = Column(Float, nullable=True)
+    saved_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=_now,
+    )
     
     created_at = Column(
         DateTime(timezone=True),
