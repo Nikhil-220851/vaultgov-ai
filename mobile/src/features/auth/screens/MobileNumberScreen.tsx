@@ -27,6 +27,7 @@ export function MobileNumberScreen() {
   const [isChecked, setIsChecked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [billingDisabled, setBillingDisabled] = useState(false);
 
   // Animated scale for checkbox tap feedback
   const [checkboxScale] = useState(() => new Animated.Value(1));
@@ -51,6 +52,8 @@ export function MobileNumberScreen() {
   };
 
   const handleSendOtp = async () => {
+    if (billingDisabled) return;
+
     const digitsOnly = phoneNumber.replace(/\D/g, '');
     
     if (digitsOnly.length !== 10) {
@@ -77,7 +80,12 @@ export function MobileNumberScreen() {
       });
     } catch (err: any) {
       console.error('[MobileNumberScreen] handleSendOtp failed:', err);
-      setError(getReadableAuthError(err));
+      const readableError = getReadableAuthError(err);
+      setError(readableError);
+      
+      if (readableError.includes('Phone authentication is temporarily unavailable')) {
+        setBillingDisabled(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -228,7 +236,7 @@ export function MobileNumberScreen() {
               title="Send OTP"
               onPress={handleSendOtp}
               loading={loading}
-              disabled={loading}
+              disabled={loading || billingDisabled}
             />
           </View>
         </View>

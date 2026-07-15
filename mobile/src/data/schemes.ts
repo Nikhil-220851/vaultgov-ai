@@ -639,7 +639,7 @@ export const SCHEMES: Scheme[] = [
       },
     ],
     accentColor: '#9C27B0',
-    iconName: 'briefcase-education',
+    iconName: 'school',
     tags: ['Skills', 'Training', 'Youth', 'Central', 'Employment'],
   },
 

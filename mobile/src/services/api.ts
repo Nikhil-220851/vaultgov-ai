@@ -394,4 +394,51 @@ export const apiClient = {
     });
     return handleResponse<VaultGovStats>(response);
   },
+
+  /**
+   * POST /api/v1/uploads/image
+   * Upload an image directly to the FastAPI backend.
+   */
+  async uploadImageToBackend(localUri: string): Promise<{ secure_url: string; public_id: string; width?: number; height?: number }> {
+    const extRaw = localUri.split('.').pop()?.toLowerCase() || 'jpg';
+    let extension = extRaw;
+    let mimeType = 'image/jpeg';
+
+    if (extRaw === 'png') {
+      mimeType = 'image/png';
+    } else if (extRaw === 'webp') {
+      mimeType = 'image/webp';
+    } else if (extRaw === 'heic') {
+      mimeType = 'image/heic';
+    } else if (extRaw === 'jpg' || extRaw === 'jpeg') {
+      mimeType = 'image/jpeg';
+    } else {
+      extension = 'jpg';
+    }
+
+    const name = `document_${Date.now()}.${extension}`;
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: localUri,
+      name: name,
+      type: mimeType,
+    } as any);
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+    if (_authToken) {
+      headers['Authorization'] = `Bearer ${_authToken}`;
+    }
+
+    // Notice we do NOT set Content-Type so fetch can auto-generate the boundary
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/uploads/image`, {
+      method: 'POST',
+      body: formData,
+      headers: headers,
+    });
+
+    return handleResponse<{ secure_url: string; public_id: string; width?: number; height?: number }>(response);
+  },
 };

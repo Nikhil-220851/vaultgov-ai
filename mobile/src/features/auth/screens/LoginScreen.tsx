@@ -22,11 +22,17 @@ export function LoginScreen() {
   const postAuthRedirect = usePostAuthRedirect();
 
   const [googleLoading, setGoogleLoading] = useState(false);
+  const isLoggingInRef = React.useRef(false);
 
   // ─── Google OAuth ────────────────────────────────────────────────────────────
 
   const handleGoogleLogin = async () => {
-    if (googleLoading) return;
+    if (isLoggingInRef.current) {
+      console.log('[LoginScreen] Google login already in progress. Ignoring tap.');
+      return;
+    }
+    
+    isLoggingInRef.current = true;
     setGoogleLoading(true);
 
     try {
@@ -37,7 +43,6 @@ export function LoginScreen() {
           uid: user.uid,
           displayName: user.displayName,
           email: user.email,
-          photoURL: user.photoURL,
         });
 
         // Smart redirect (fetches/upserts user profile and routes correctly)
@@ -45,14 +50,18 @@ export function LoginScreen() {
       } else {
         // User cancelled or an error occurred — already logged in the service
         console.log('[LoginScreen] Google sign-in did not complete.');
+        isLoggingInRef.current = false;
+        setGoogleLoading(false);
       }
 
     } catch (error) {
       // Defensive catch — individual errors are already handled inside useGoogleAuth
       console.error('[LoginScreen] Unexpected error during Google login:', error);
-    } finally {
+      isLoggingInRef.current = false;
       setGoogleLoading(false);
     }
+    // We intentionally don't set loading to false here if successful, 
+    // because postAuthRedirect will unmount this screen.
   };
 
   // ─── OTP Flow (unchanged) ────────────────────────────────────────────────────

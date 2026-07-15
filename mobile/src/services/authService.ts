@@ -93,42 +93,6 @@ export const useGoogleAuth = () => {
  * Contains logic for Google Sign-In and placeholders for OTP-based authentication.
  */
 export const AuthService = {
-  /**
-   * Google Sign-In wrapper (non-hook alternative or placeholder).
-   */
-  async signInWithGoogle(): Promise<AuthResponse> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          user: {
-            id: 'mock-google-uid-12345',
-            email: 'user@vaultgov.gov',
-            displayName: 'Citizen User',
-          },
-        });
-      }, 800);
-    });
-  },
-
-  /**
-   * Initiates authentication using OTP.
-   * TODO: Implement production One-Time Password validation.
-   */
-  async signInWithOTP(): Promise<AuthResponse> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          user: {
-            id: 'mock-otp-uid-67890',
-            phoneNumber: '+15550199',
-            displayName: 'Citizen User',
-          },
-        });
-      }, 800);
-    });
-  },
 
   /**
    * Signs out the currently authenticated Firebase user.
@@ -274,6 +238,9 @@ export const getReadableAuthError = (err: any): string => {
   }
   if (code.includes('auth/quota-exceeded')) {
     return 'SMS quota exceeded. Please try again later.';
+  }
+  if (code.includes('auth/billing-not-enabled')) {
+    return 'Phone authentication is temporarily unavailable.\n\nPlease sign in using Google.\n\nOTP login will be enabled once Firebase billing is activated.';
   }
   
   return err.message || 'Authentication failed. Please try again.';

@@ -23,6 +23,8 @@ import { devOCRAdapter } from '../services/ocr.dev-adapter';
 import { mapDocumentTypeToCategory, mapCategoryFieldToCategory } from '../services/document-category.mapper';
 import { useDocumentStore } from '../store/useDocumentStore';
 import { apiClient } from '@/services/api';
+import { storageService } from '@/services/storageService';
+import { auth } from '@/services/firebase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +100,8 @@ export function useDocumentIngestion(
   // Prevent OCR from running multiple times for the same file
   const lastOcrUri = useRef<string | null>(null);
 
+  const isSavingRef = useRef(false);
+
   // ── Run OCR whenever the file changes ──────────────────────────────────────
   useEffect(() => {
     if (!file) return;
@@ -159,7 +163,10 @@ export function useDocumentIngestion(
 
   // ── saveDocument ───────────────────────────────────────────────────────────
   const saveDocument = useCallback(async () => {
-    if (isSaving) return; // Guard against double-tap
+    if (isSavingRef.current) {
+      console.log('[useDocumentIngestion] Save already in progress. Ignoring duplicate request.');
+      return;
+    }
 
     // Validate required fields
     if (!allRequiredFieldsFilled(fields)) {
@@ -176,23 +183,37 @@ export function useDocumentIngestion(
       return;
     }
 
+    isSavingRef.current = true;
     setIsSaving(true);
     try {
-      const payload = buildDocumentPayload(fields, file.uri);
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        throw new Error('User not authenticated.');
+      }
+
+      console.log('[useDocumentIngestion] Uploading image to Cloudinary...');
+      const downloadUrl = await storageService.uploadDocumentImage(file.uri);
+
+      const payload = buildDocumentPayload(fields, downloadUrl);
       await apiClient.createDocument(payload);
       await fetchDocuments();
 
       // Use replace so Back from Docs does not reopen the preview screen
       router.replace('/(tabs)/docs' as any);
-    } catch (err) {
+    } catch (err: any) {
       console.error('[useDocumentIngestion] Save error:', err);
-      Alert.alert('Save failed', 'An error occurred while saving. Please try again.', [
-        { text: 'OK' },
-      ]);
+      if (err.message && err.message.includes('Network request failed')) {
+        Alert.alert('Upload failed', 'No internet connection. Please check your network and try again.', [{ text: 'OK' }]);
+      } else if (err.message && err.message.includes('upload')) {
+        Alert.alert('Upload failed', 'Image upload failed. Please try again.', [{ text: 'OK' }]);
+      } else {
+        Alert.alert('Save failed', 'Document upload failed. Please try again.', [{ text: 'OK' }]);
+      }
     } finally {
       setIsSaving(false);
+      isSavingRef.current = false;
     }
-  }, [isSaving, fields, file, fetchDocuments, router]);
+  }, [fields, file, fetchDocuments, router]);
 
   const canSave = allRequiredFieldsFilled(fields);
 

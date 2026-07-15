@@ -39,6 +39,10 @@ export const DocumentsScreen: React.FC = () => {
 
   const handleDocumentPress = (id: string, title: string) => {
     console.log(`[DocumentsScreen] Document pressed: ${title} (ID: ${id})`);
+    router.push({
+      pathname: '/document/[id]' as any,
+      params: { id },
+    });
   };
 
   // ── Upload sheet handlers ──────────────────────────────────────────────────

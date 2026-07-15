@@ -83,6 +83,38 @@ def delete_document(
     current_uid: str = Depends(get_current_uid),
 ) -> None:
     user_id = _get_user_id(db, current_uid)
+    
+    # Get document to extract image_uri before deletion
+    doc = document_service.get_document(db, document_id, user_id)
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    
+    # Try to delete from Cloudinary if there's an image
+    if doc.image_uri and "cloudinary.com" in doc.image_uri:
+        try:
+            # Example URI: https://res.cloudinary.com/.../upload/v1234/documents/abc.jpg
+            # Extract public_id: documents/abc
+            parts = doc.image_uri.split("/upload/")
+            if len(parts) > 1:
+                path_part = parts[1]
+                # Remove version if present (e.g. v1234/)
+                path_parts = path_part.split("/")
+                if path_parts[0].startswith("v") and path_parts[0][1:].isdigit():
+                    path_parts = path_parts[1:]
+                
+                # Rejoin and remove extension
+                public_id_with_ext = "/".join(path_parts)
+                public_id = public_id_with_ext.rsplit(".", 1)[0]
+                
+                from app.services import cloudinary_service
+                cloudinary_service.delete_image(public_id)
+        except Exception as e:
+            # Log error but don't fail the deletion
+            print(f"Failed to delete image from Cloudinary: {e}")
+
     success = document_service.delete_document(db, document_id, user_id)
     if not success:
         raise HTTPException(

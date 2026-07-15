@@ -30,6 +30,8 @@ import { Colors, Spacing, Typography, Radius } from '@/theme';
 import { DocumentReviewData, DocumentReviewCategory, OCRConfidenceLevel } from '../types/ocr.types';
 import { useDocumentStore } from '@/features/documents/store/useDocumentStore';
 import { apiClient } from '@/services/api';
+import { storageService } from '@/services/storageService';
+import { auth } from '@/services/firebase';
 
 // ─── Categories ───────────────────────────────────────────────────────────────
 
@@ -84,6 +86,9 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
   const [tagsInput, setTagsInput] = useState(reviewData.tags.join(', '));
   const [isSaving, setIsSaving] = useState(false);
 
+  const [saveStatus, setSaveStatus] = useState('');
+  const isSavingRef = React.useRef(false);
+
   const [saveButtonScale] = useState(() => new Animated.Value(1));
 
   // ── Category selector ────────────────────────────────────────────────────────
@@ -96,11 +101,15 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
           styles.categoryChip,
           isSelected && styles.categoryChipSelected,
           pressed && { opacity: 0.8 },
+          isSaving && { opacity: 0.5 },
         ]}
-        onPress={() => setCategory(item.label)}
+        onPress={() => {
+          if (!isSaving) setCategory(item.label);
+        }}
         accessibilityLabel={`Select category ${item.label}`}
         accessibilityRole="button"
         accessibilityState={{ selected: isSelected }}
+        disabled={isSaving}
       >
         <Ionicons
           name={item.icon as any}
@@ -117,13 +126,21 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
   // ── Save handler ─────────────────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
+    if (isSavingRef.current) {
+      console.log('[DocumentReview] Save already in progress. Ignoring duplicate tap.');
+      return;
+    }
+
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       Alert.alert('Missing title', 'Please enter a document title before saving.');
       return;
     }
 
+    isSavingRef.current = true;
     setIsSaving(true);
+    setSaveStatus('Uploading image...');
+
     Animated.sequence([
       Animated.timing(saveButtonScale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
       Animated.timing(saveButtonScale, { toValue: 1, duration: 80, useNativeDriver: true }),
@@ -135,25 +152,44 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         .map(t => t.trim())
         .filter(Boolean);
 
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        throw new Error('User not authenticated.');
+      }
+
+      // Upload image to Cloudinary
+      console.log('[DocumentReview] Uploading image to Cloudinary...');
+      const downloadUrl = await storageService.uploadDocumentImage(reviewData.imageUri);
+
+      setSaveStatus('Saving document...');
       await apiClient.createDocument({
         title: trimmedTitle,
         category,
-        image_uri: reviewData.imageUri,
+        image_uri: downloadUrl,
         source: reviewData.metadata.source === 'camera' ? 'camera' : 'upload',
         extracted_text: reviewData.extractedText,
         tags,
         confidence_score: reviewData.confidence.score ?? 0,
       });
 
+      setSaveStatus('Done.');
       await fetchDocuments();
       console.log('[OCR] Document saved:', trimmedTitle);
 
       router.replace('/(tabs)/docs' as any);
-    } catch (err) {
+    } catch (err: any) {
       console.error('[DocumentReview] Save error:', err);
-      Alert.alert('Save failed', 'An error occurred while saving. Please try again.');
+      if (err.message && err.message.includes('Network request failed')) {
+        Alert.alert('Upload failed', 'No internet connection. Please check your network and try again.');
+      } else if (err.message && err.message.includes('upload')) {
+        Alert.alert('Upload failed', 'Image upload failed. Please try again.');
+      } else {
+        Alert.alert('Save failed', 'Document upload failed. Please try again.');
+      }
     } finally {
       setIsSaving(false);
+      isSavingRef.current = false;
+      setSaveStatus('');
     }
   }, [title, category, tagsInput, reviewData, fetchDocuments, router, saveButtonScale]);
 
@@ -226,6 +262,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
             selectionColor={Colors.primaryBlue}
             returnKeyType="done"
             accessibilityLabel="Document title"
+            editable={!isSaving}
           />
         </View>
 
@@ -243,7 +280,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         <View style={styles.section}>
           <SectionHeader title="Tags (optional)" icon="pricetag-outline" />
           <TextInput
-            style={styles.tagsInput}
+            style={[styles.tagsInput, isSaving && { opacity: 0.5 }]}
             value={tagsInput}
             onChangeText={setTagsInput}
             placeholder="aadhaar, 2024, identity…"
@@ -251,6 +288,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
             selectionColor={Colors.primaryBlue}
             returnKeyType="done"
             accessibilityLabel="Document tags"
+            editable={!isSaving}
           />
           <Text style={styles.tagsHint}>Separate tags with commas</Text>
         </View>
@@ -277,7 +315,10 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
             accessibilityRole="button"
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color={Colors.white} />
+              <>
+                <ActivityIndicator size="small" color={Colors.white} />
+                <Text style={styles.saveButtonText}>{saveStatus || 'Uploading...'}</Text>
+              </>
             ) : (
               <>
                 <Ionicons name="save-outline" size={20} color={Colors.white} />
