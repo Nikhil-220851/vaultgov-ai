@@ -1,17 +1,20 @@
 import React, { useState, useCallback } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { auth } from '@/services/firebase';
 import { useUser } from '@/context/UserContext';
 import { styles } from './styles';
-import { apiClient, VaultGovStats } from '@/services/api';
+import { VaultGovStats } from '@/services/api';
+import { useStatsStore } from '@/store/useStatsStore';
+import { Colors, Typography, Spacing } from '@/theme';
 
 // Subcomponents — use named imports to satisfy import/no-named-as-default
 import { Header } from './components/Header';
 import { Greeting } from './components/Greeting';
 import { OverviewCard } from './components/OverviewCard';
 import { QuickActionCard } from './components/QuickActionCard';
+import { RecentDocumentCard } from './components/RecentDocumentCard';
 import { UploadDocumentSheet } from '@/features/documents/components/UploadDocumentSheet';
 import {
   pickPdfDocument,
@@ -22,22 +25,13 @@ export const HomeScreen: React.FC = () => {
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const { user: dbUser } = useUser();
-  const [stats, setStats] = useState<VaultGovStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { stats, isLoading: loading, fetchStats } = useStatsStore();
 
-  React.useEffect(() => {
-    async function loadStats() {
-      try {
-        const data = await apiClient.getStats();
-        setStats(data);
-      } catch (err) {
-        console.error('Failed to load stats:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadStats();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchStats();
+    }, [fetchStats])
+  );
 
   // Pull logged-in user details if available
   const displayName = dbUser?.full_name || auth.currentUser?.displayName || auth.currentUser?.phoneNumber || 'User';
@@ -66,6 +60,18 @@ export const HomeScreen: React.FC = () => {
       router.push('/(tabs)/schemes' as any);
     }
   };
+
+  /** Navigate to Document Details from a recent-upload card tap. */
+  const handleRecentDocumentPress = useCallback(
+    (id: string) => {
+      console.log('[HomeScreen] Recent document pressed:', id);
+      router.push({
+        pathname: '/document/[id]' as any,
+        params: { id },
+      });
+    },
+    [router]
+  );
 
 
 
@@ -168,6 +174,29 @@ export const HomeScreen: React.FC = () => {
           </View>
         ) : null)}
 
+        {/* Recent Documents Section — only shown when uploads exist */}
+        {stats && stats.recent_uploads && stats.recent_uploads.length > 0 && (
+          <>
+            <View style={[styles.sectionHeader, localStyles.recentHeader]}>
+              <Text style={styles.sectionTitle}>RECENT DOCUMENTS</Text>
+              <Pressable
+                onPress={() => router.push('/(tabs)/docs' as any)}
+                accessibilityRole="button"
+                accessibilityLabel="View all documents"
+              >
+                <Text style={localStyles.viewAll}>View all</Text>
+              </Pressable>
+            </View>
+            {stats.recent_uploads.slice(0, 3).map((doc) => (
+              <RecentDocumentCard
+                key={doc.id}
+                item={doc}
+                onPress={() => handleRecentDocumentPress(doc.id)}
+              />
+            ))}
+          </>
+        )}
+
         {/* Quick Actions Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitleDark}>QUICK ACTIONS</Text>
@@ -201,6 +230,17 @@ const localStyles = StyleSheet.create({
   },
   scrollContainer: {
     paddingBottom: 130, // Extra bottom padding so scroll content clears sticky tab navigation
+  },
+  recentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  viewAll: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.primaryBlue,
+    fontFamily: Typography.fontFamilies.sans,
   },
 });
 

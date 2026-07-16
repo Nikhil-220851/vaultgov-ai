@@ -22,6 +22,7 @@
  */
 
 import { API_BASE_URL, API_TIMEOUT_MS, API_MAX_RETRIES } from '@/config/api.config';
+import { File } from 'expo-file-system';
 
 // ─── Error Types ──────────────────────────────────────────────────────────────
 
@@ -148,7 +149,7 @@ async function fetchWithTimeout(
     url,
     method: options.method ?? 'GET',
     headers: options.headers,
-    body: options.body ? String(options.body).substring(0, 200) : null,
+    body: options.body instanceof FormData ? '[FormData Blob]' : (options.body ? String(options.body).substring(0, 200) : null),
     timeoutMs: API_TIMEOUT_MS,
     signalAborted: controller.signal.aborted,
   });
@@ -418,12 +419,18 @@ export const apiClient = {
 
     const name = `document_${Date.now()}.${extension}`;
 
+    // 1. Normalize Android/iOS URI to guarantee `file://` scheme where applicable
+    const normalizedUri = localUri.startsWith('file://') || localUri.startsWith('content://') || localUri.startsWith('http')
+      ? localUri 
+      : `file://${localUri}`;
+
+    // 2. Create a File object directly from the local URI (Expo SDK 56 / Hermes compliant)
+    // This replaces the unsupported fetch(uri).blob() which causes ArrayBuffer errors.
+    const file = new File(normalizedUri);
+
+    // 3. Append the File directly to FormData. Bypasses the legacy React Native object parser entirely.
     const formData = new FormData();
-    formData.append('file', {
-      uri: localUri,
-      name: name,
-      type: mimeType,
-    } as any);
+    (formData as any).append('file', file, name);
 
     const headers: Record<string, string> = {
       'Accept': 'application/json',

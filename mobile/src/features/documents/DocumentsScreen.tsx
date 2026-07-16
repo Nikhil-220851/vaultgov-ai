@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { auth } from '@/services/firebase';
 import { Colors } from '@/theme';
 import { CategoryFilter, CategoryType } from './components/CategoryFilter';
@@ -19,7 +19,13 @@ import { AppHeader } from '@/components/AppHeader';
 
 export const DocumentsScreen: React.FC = () => {
   const router = useRouter();
-  const { documents, isHydrating } = useDocumentStore();
+  const { documents, isHydrating, fetchDocuments } = useDocumentStore();
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDocuments();
+    }, [fetchDocuments])
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('All');
   const [isSheetOpen, setIsSheetOpen] = useState(false);

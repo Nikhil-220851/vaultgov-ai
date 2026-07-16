@@ -25,6 +25,7 @@ import { useDocumentStore } from '../store/useDocumentStore';
 import { apiClient } from '@/services/api';
 import { storageService } from '@/services/storageService';
 import { auth } from '@/services/firebase';
+import { useStatsStore } from '@/store/useStatsStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ export function useDocumentIngestion(
   onAssetChanged?: (file: SelectedFile) => void,
 ): UseDocumentIngestionReturn {
   const router = useRouter();
-  const { fetchDocuments } = useDocumentStore();
+
 
   const [file, setFile] = useState<SelectedFile | null>(initialFile);
   const [ocrStatus, setOcrStatus] = useState<OCRStatus>('idle');
@@ -195,8 +196,16 @@ export function useDocumentIngestion(
       const downloadUrl = await storageService.uploadDocumentImage(file.uri);
 
       const payload = buildDocumentPayload(fields, downloadUrl);
-      await apiClient.createDocument(payload);
-      await fetchDocuments();
+      const newDoc = await apiClient.createDocument(payload);
+      
+      // Update the local store immediately to ensure the UI reflects the upload instantly
+      useDocumentStore.getState().addDocument(newDoc);
+      
+      // Update the dashboard stats
+      await useStatsStore.getState().fetchStats();
+
+      // Optionally fetch in the background to ensure sync, but without awaiting
+      useDocumentStore.getState().fetchDocuments().catch(console.error);
 
       // Use replace so Back from Docs does not reopen the preview screen
       router.replace('/(tabs)/docs' as any);
@@ -213,7 +222,7 @@ export function useDocumentIngestion(
       setIsSaving(false);
       isSavingRef.current = false;
     }
-  }, [fields, file, fetchDocuments, router]);
+  }, [fields, file, router]);
 
   const canSave = allRequiredFieldsFilled(fields);
 
