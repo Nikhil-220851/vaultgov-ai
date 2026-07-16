@@ -34,7 +34,7 @@ def initialize_firebase() -> None:
     if os.path.exists(cred_path):
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred, options={"projectId": project_id})
-        print(f"[Firebase] ✅ Admin SDK initialised from {cred_path} with project ID: {project_id}")
+        print(f"[Firebase] [OK] Admin SDK initialised from {cred_path} with project ID: {project_id}")
     else:
         # ─── CRITICAL WARNING ─────────────────────────────────────────────────────
         # Service account credentials file not found. Firebase Admin will start in
@@ -46,7 +46,7 @@ def initialize_firebase() -> None:
         #   → Generate new private key → Save as: backend/firebase-service-account.json
         # ─────────────────────────────────────────────────────────────────────────
         print(
-            f"\n[Firebase] ❌ CRITICAL: Service account credentials NOT FOUND at '{cred_path}'.\n"
+            f"\n[Firebase] [CRITICAL ERROR] Service account credentials NOT FOUND at '{cred_path}'.\n"
             f"[Firebase]    All authenticated API requests will fail with 401 Unauthorized.\n"
             f"[Firebase]    Fix: Download firebase-service-account.json from Firebase Console\n"
             f"[Firebase]    (Project: {project_id} → Settings → Service Accounts → Generate new private key)\n"

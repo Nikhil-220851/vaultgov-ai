@@ -25,8 +25,10 @@ load_dotenv(dotenv_path=env_path)
 # ── Import Base (which has all model metadata registered) ────────────────────
 # Importing the model explicitly ensures it is registered on Base.metadata
 from app.database.connection import Base  # noqa: E402
-from app.models.user import User  # noqa: E402, F401 (import triggers registration)
-from app.models.document import Document  # noqa: E402, F401 (import triggers registration)
+from app.models.user import User  # noqa: E402, F401
+from app.models.document import Document  # noqa: E402, F401
+from app.models.scheme import Scheme  # noqa: E402, F401
+
 
 # ── Alembic Config ────────────────────────────────────────────────────────────
 config = context.config
