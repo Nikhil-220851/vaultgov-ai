@@ -66,21 +66,15 @@ export default function AuthGateScreen() {
   const { user, setUser } = useUser();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
-  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
 
-  // ── Permission helper ─────────────────────────────────────────────────────
-  // (Removed checkPermissions as it was redundant with DB state check)
-
-  // ── Route Hydration Effect ────────────────────────────────────────────────
+  // ── Track mount status to prevent updates on unmounted component ──────────
+  const isMountedRef = useRef(true);
   useEffect(() => {
-    if (pendingRoute && user) {
-      console.log('Final Route:', pendingRoute);
-      router.replace(pendingRoute as any);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPendingRoute(null);
-    }
-  }, [pendingRoute, user, router]);
-
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // ── Core resolution logic (extracted so Retry can reuse it) ──────────────
 
@@ -97,7 +91,7 @@ export default function AuthGateScreen() {
     return new Promise<void>((resolve) => {
       console.log('[AuthGate] Subscribing to onAuthStateChanged...');
       const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-        console.log('[AuthGate] onAuthStateChanged fired. User:', fbUser ? fbUser.uid : 'null');
+        console.log(`[AuthGate Auth Debug] onAuthStateChanged fired. Firebase user exists: ${!!fbUser} (UID: ${fbUser?.uid ?? 'null'})`);
         unsubscribe();
 
         if (!fbUser) {
@@ -108,10 +102,14 @@ export default function AuthGateScreen() {
             console.log('[AuthGate] Checking onboarding state...');
             const onboarded = await isOnboardingComplete();
             console.log('[AuthGate] Onboarding complete status:', onboarded);
-            router.replace(onboarded ? ('/login' as any) : ('/onboarding' as any));
+            if (isMountedRef.current) {
+              router.replace(onboarded ? ('/login' as any) : ('/onboarding' as any));
+            }
           } catch (e) {
             console.log('[AuthGate] Error checking onboarding status, redirecting to onboarding:', e);
-            router.replace('/onboarding' as any);
+            if (isMountedRef.current) {
+              router.replace('/onboarding' as any);
+            }
           }
           resolve();
           return;
@@ -121,10 +119,9 @@ export default function AuthGateScreen() {
 
         try {
           // 1. Get a fresh ID token and inject into the API client
-          console.log('[AuthGate] Calling fbUser.getIdToken()...');
+          console.log('[AuthGate Auth Debug] Calling fbUser.getIdToken()...');
           const idToken = await fbUser.getIdToken();
-          console.log('JWT Received');
-          console.log('[AuthGate] getIdToken() succeeded, token prefix:', idToken ? idToken.substring(0, 15) : 'null');
+          console.log(`[AuthGate Auth Debug] ID Token successfully retrieved (prefix: ${idToken ? idToken.substring(0, 15) : 'null'}...)`);
           apiClient.setAuthToken(idToken);
 
           // ── DIAGNOSTIC: bare-metal /health test ──────────────────────────
@@ -205,31 +202,35 @@ export default function AuthGateScreen() {
             email: dbUser.email
           });
 
-          // 3. Route based on profile + permissions state
-          if (!dbUser.profile_completed) {
-            console.log('[AuthGate] Profile incomplete → Complete Profile.');
-            setPendingRoute('/complete-profile');
-          } else if (!dbUser.onboarding_permissions_seen) {
-            console.log('[AuthGate] Permissions missing → Grant Permissions.');
-            setPendingRoute('/grant-permissions');
-          } else {
-            console.log('[AuthGate] All steps complete → Home.');
-            setPendingRoute('/(tabs)/home');
+          // 3. Route based on profile + permissions state directly
+          if (isMountedRef.current) {
+            if (!dbUser.profile_completed) {
+              console.log('[AuthGate] Profile incomplete → Complete Profile.');
+              router.replace('/complete-profile');
+            } else if (!dbUser.onboarding_permissions_seen) {
+              console.log('[AuthGate] Permissions missing → Grant Permissions.');
+              router.replace('/grant-permissions');
+            } else {
+              console.log('[AuthGate] All steps complete → Home.');
+              router.replace('/(tabs)/home');
+            }
           }
         } catch (err: any) {
           console.log('[AuthGate] resolveSession caught error:', err);
           console.error('[AuthGate] Session resolution failed:', err);
-          setChecking(false);
+          if (isMountedRef.current) {
+            setChecking(false);
 
-          if (isNetworkError(err)) {
-            setErrorMsg(
-              `Unable to reach the server at:\n${API_BASE_URL}\n\n` +
-                'Make sure your device and backend are on the same Wi-Fi network, then tap Retry.'
-            );
-          } else {
-            setErrorMsg(
-              err.message || 'An unexpected error occurred while loading your profile.'
-            );
+            if (isNetworkError(err)) {
+              setErrorMsg(
+                `Unable to reach the server at:\n${API_BASE_URL}\n\n` +
+                  'Make sure your device and backend are on the same Wi-Fi network, then tap Retry.'
+              );
+            } else {
+              setErrorMsg(
+                err.message || 'An unexpected error occurred while loading your profile.'
+              );
+            }
           }
         }
         isResolvingRef.current = false;

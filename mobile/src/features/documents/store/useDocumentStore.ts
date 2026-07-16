@@ -19,6 +19,7 @@ import {
   Dispatch,
 } from 'react';
 import { apiClient, VaultGovDocument } from '@/services/api';
+import { useUser } from '@/context/UserContext';
 
 
 // ─── State & Actions ──────────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ export function useDocumentStoreInternal(): {
   fetchDocuments: () => Promise<void>;
 } {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const { user } = useUser();
 
   const fetchDocuments = async () => {
     try {
@@ -103,8 +105,12 @@ export function useDocumentStoreInternal(): {
   };
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    if (user) {
+      fetchDocuments();
+    } else {
+      dispatch({ type: 'HYDRATE', payload: [] });
+    }
+  }, [user]);
 
   return { state, dispatch, fetchDocuments };
 }

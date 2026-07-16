@@ -68,12 +68,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
    * it requires a valid Firebase ID token.
    */
   const refetchUser = useCallback(async () => {
+    console.log(`[UserContext refetchUser Debug] Checking Firebase user... User exists: ${!!firebaseUser} (UID: ${firebaseUser?.uid ?? 'null'})`);
     if (!firebaseUser) {
       setUser(null);
       return;
     }
     try {
+      console.log('[UserContext refetchUser Debug] Retrieving Firebase ID token...');
       const idToken = await firebaseUser.getIdToken();
+      console.log(`[UserContext refetchUser Debug] ID token retrieved successfully (prefix: ${idToken ? idToken.substring(0, 15) : 'null'}...)`);
       apiClient.setAuthToken(idToken);
       const dbUser = await apiClient.getUser(firebaseUser.uid);
       setUser(dbUser);

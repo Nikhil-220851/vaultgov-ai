@@ -25,18 +25,22 @@ export function SchemeCard({ scheme, onPress, onBookmark, isSaved = false }: Sch
   const docsReady = totalDocs - missingDocs;
 
   const eligibilityColor =
-    scheme.eligibilityStatus === 'eligible'
+    scheme.eligibilityStatus === 'highly_recommended'
+      ? '#1B8A3E'
+      : scheme.eligibilityStatus === 'eligible'
       ? '#3CC556'
       : scheme.eligibilityStatus === 'partially_eligible'
       ? '#FF9800'
       : '#FF3B30';
 
   const eligibilityLabel =
-    scheme.eligibilityStatus === 'eligible'
-      ? 'Eligible'
+    scheme.eligibilityStatus === 'highly_recommended'
+      ? 'Likely Eligible'
+      : scheme.eligibilityStatus === 'eligible'
+      ? 'Potential Match'
       : scheme.eligibilityStatus === 'partially_eligible'
       ? 'Partial Match'
-      : 'Not Eligible';
+      : 'Unlikely Match';
 
   return (
     <AnimatedPressable onPress={() => onPress(scheme)} style={styles.card}>
@@ -163,7 +167,7 @@ export function SchemeCard({ scheme, onPress, onBookmark, isSaved = false }: Sch
               scheme.eligibilityStatus === 'not_eligible' && styles.applyTextDisabled,
             ]}
           >
-            {scheme.eligibilityStatus === 'not_eligible' ? 'View Details' : 'Apply Now'}
+            View Details
           </Text>
           <Ionicons
             name="arrow-forward"

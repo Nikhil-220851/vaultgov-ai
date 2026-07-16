@@ -17,6 +17,31 @@ export function ApplicationSummary({ scheme, applicationId }: ApplicationSummary
   const displayName = dbUser?.full_name || auth.currentUser?.displayName || 'User';
   const mobileNumber = auth.currentUser?.phoneNumber || 'Not provided';
 
+  const calculateAge = (dobString: string | null | undefined): string => {
+    if (!dobString) return 'Not provided';
+    const birthDate = new Date(dobString);
+    if (isNaN(birthDate.getTime())) return 'Not provided';
+    const today = new Date('2026-07-14'); // Current system local time
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return `${age} years`;
+  };
+
+  const INCOME_LABELS: Record<string, string> = {
+    'EWS': 'EWS (Below ₹3 Lakhs)',
+    'LIG': 'LIG (₹3L - ₹6 Lakhs)',
+    'MIG': 'MIG (₹6L - ₹12 Lakhs)',
+    'HIG': 'HIG (Above ₹12 Lakhs)'
+  };
+
+  const ageVal = calculateAge(dbUser?.date_of_birth);
+  const stateVal = dbUser?.state || 'Not provided';
+  const occupationVal = dbUser?.occupation || 'Not provided';
+  const incomeVal = dbUser?.annual_income ? (INCOME_LABELS[dbUser.annual_income] || dbUser.annual_income) : 'Not provided';
+
   const readyDocs = scheme.requiredDocuments.filter(
     (d) => d.status === 'uploaded' || d.status === 'verified'
   );
@@ -48,10 +73,10 @@ export function ApplicationSummary({ scheme, applicationId }: ApplicationSummary
         <View style={styles.infoGrid}>
           <InfoRow label="Full Name" value={displayName} />
           <InfoRow label="Mobile Number" value={mobileNumber} />
-          <InfoRow label="Age" value={`N/A`} />
-          <InfoRow label="State" value={'N/A'} />
-          <InfoRow label="Education" value={'N/A'} />
-          <InfoRow label="Annual Income" value={`N/A`} />
+          <InfoRow label="Age" value={ageVal} />
+          <InfoRow label="State" value={stateVal} />
+          <InfoRow label="Education / Occupation" value={occupationVal} />
+          <InfoRow label="Annual Income" value={incomeVal} />
         </View>
       </View>
 

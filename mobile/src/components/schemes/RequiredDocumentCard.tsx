@@ -22,6 +22,7 @@ const STATUS_ICON: Record<DocumentStatus, string> = {
   uploaded: 'check-circle',
   expired: 'clock-alert',
   missing: 'file-question',
+  optional: 'file-document-outline',
 };
 
 export function RequiredDocumentCard({
