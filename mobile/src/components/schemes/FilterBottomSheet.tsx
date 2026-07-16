@@ -36,14 +36,29 @@ export const DEFAULT_FILTER: SchemeFilter = {
 };
 
 const CATEGORIES = [
-  'Education',
-  'Agriculture',
+  'Student',
+  'Farmer',
+  'Women',
+  'Senior Citizens',
   'Health',
-  'Housing',
+  'Insurance',
+  'Employment',
   'Skill Development',
-  'Technology',
-  'Women & Child',
+  'Business',
+  'Startup',
+  'Housing',
+  'Agriculture',
   'Pension',
+  'Financial Inclusion',
+  'Education',
+  'Social Welfare',
+  'Disabled',
+  'Youth',
+  'Government',
+  'CSR',
+  'Scholarship',
+  'MSME',
+  'Research'
 ];
 
 interface FilterBottomSheetProps {

@@ -1,18 +1,35 @@
-// ─── VaultGov AI — Government Schemes Data ───────────────────────────────────
+import { VaultGovUser, VaultGovDocument } from '@/services/api';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SchemeCategory =
-  | 'Education'
-  | 'Agriculture'
+  | 'Student'
+  | 'Farmer'
+  | 'Women'
+  | 'Senior Citizens'
   | 'Health'
-  | 'Housing'
+  | 'Insurance'
+  | 'Employment'
   | 'Skill Development'
-  | 'Technology'
-  | 'Women & Child'
-  | 'Pension';
+  | 'Business'
+  | 'Startup'
+  | 'Housing'
+  | 'Agriculture'
+  | 'Pension'
+  | 'Financial Inclusion'
+  | 'Education'
+  | 'Social Welfare'
+  | 'Disabled'
+  | 'Youth'
+  | 'Government'
+  | 'CSR'
+  | 'Scholarship'
+  | 'MSME'
+  | 'Research';
 
 export type SchemeType = 'Central' | 'State';
-export type EligibilityStatus = 'eligible' | 'partially_eligible' | 'not_eligible';
-export type DocumentStatus = 'uploaded' | 'missing' | 'expired' | 'verified';
+export type EligibilityStatus = 'highly_recommended' | 'eligible' | 'partially_eligible' | 'not_eligible';
+export type DocumentStatus = 'uploaded' | 'missing' | 'expired' | 'verified' | 'optional';
 export type ApplicationStatus =
   | 'submitted'
   | 'under_review'
@@ -66,11 +83,48 @@ export interface Scheme {
   eligibilityStatus: EligibilityStatus;
   eligibilityCriteria: EligibilityCriterion[];
   requiredDocuments: RequiredDocument[];
+  recommendedDocuments: RequiredDocument[];
   faqs: FAQ[];
+
   accentColor: string;
   iconName: string;
   tags: string[];
+
+  // Database fields for compliance
+  name: string;
+  shortDescription: string;
+  fullDescription: string;
+  subcategory: string;
+  targetAudience: string;
+  minAge: number;
+  maxAge?: number;
+  gender: string;
+  incomeLimit: string;
+  occupation: string;
+  studentEligible: boolean;
+  farmerEligible: boolean;
+  seniorCitizenEligible: boolean;
+  disabledEligible: boolean;
+  documentsRequired: string[];
+  officialWebsite: string;
+  officialApplyLink: string;
+  launchYear: number;
+  applicationMode: string;
+  status: string;
+
+  // Sync details
+  version: number;
+  contentHash?: string;
+  lastUpdated: string;
+  officialNotification: string;
+
+  // Source Metadata
+  sourceName?: string;
+  sourceURL?: string;
+  verifiedBy?: string;
+  verificationDate?: string;
 }
+
 
 export interface AppliedScheme {
   schemeId: string;
@@ -80,887 +134,588 @@ export interface AppliedScheme {
   submittedAt: string;
 }
 
+// ─── 10 Real Government Schemes Seeding Data ───────────────────────────────────
 
-
-// ─── Scheme Data ──────────────────────────────────────────────────────────────
-
-export const SCHEMES: Scheme[] = [
-  // ── 1. Student Scholarship ─────────────────────────────────────────────────
+export const BASE_SCHEMES_DATA = [
   {
-    id: 'scheme-001',
-    title: 'National Scholarship Portal — Central Scholarship',
-    shortTitle: 'Student Scholarship',
-    department: 'Department of Higher Education',
-    ministry: 'Ministry of Education',
-    category: 'Education',
-    type: 'Central',
-    description:
-      'The National Scholarship Portal is a one-stop solution for students seeking scholarships from Central and State Governments. It provides merit-cum-means financial assistance to students from economically weaker sections to pursue professional and technical courses across India.',
-    benefits: [
-      'Financial assistance of ₹10,000 to ₹50,000 per year',
-      'Direct Benefit Transfer to student bank account',
-      'Non-repayable grant — not a loan',
-      'Renewable for full duration of course',
-      'Covers tuition fees, books, and living expenses',
-    ],
-    financialAssistance: '₹10,000 – ₹50,000 per annum',
-    applicationPeriod: 'July 1 – October 31 annually',
-    renewable: true,
-    renewalPeriod: 'Annual renewal on merit basis',
-    deadline: 'Oct 31, 2026',
-    processingTime: '30–60 working days',
-    applicationFee: 0,
-    officialPortal: 'https://scholarships.gov.in',
-    eligibilityPercentage: 38,
-    eligibilityStatus: 'not_eligible',
-    eligibilityCriteria: [
-      {
-        id: 'ec-001-1',
-        label: 'Age Requirement',
-        required: '17–25 years',
-        userValue: '28 years',
-        passed: false,
-        reason: 'Your age (28) exceeds the maximum age limit of 25 years for this scholarship.',
-      },
-      {
-        id: 'ec-001-2',
-        label: 'Annual Family Income',
-        required: 'Below ₹2,50,000',
-        userValue: '₹2,80,000',
-        passed: false,
-        reason: 'Your annual income (₹2,80,000) exceeds the eligibility limit of ₹2,50,000.',
-      },
-      {
-        id: 'ec-001-3',
-        label: 'Education Level',
-        required: '10th / 12th Pass or pursuing UG / PG',
-        userValue: 'Graduate',
-        passed: true,
-      },
-      {
-        id: 'ec-001-4',
-        label: 'Indian Citizenship',
-        required: 'Indian Citizen',
-        userValue: 'Indian Citizen',
-        passed: true,
-      },
-    ],
-    requiredDocuments: [
-      {
-        id: 'rd-001-1',
-        name: 'Aadhaar Card',
-        iconName: 'card-account-details',
-        status: 'verified',
-        description: 'Government issued Aadhaar card',
-      },
-      {
-        id: 'rd-001-2',
-        name: 'Income Certificate',
-        iconName: 'file-document',
-        status: 'missing',
-        description: 'Issued by competent authority (less than 1 year old)',
-      },
-      {
-        id: 'rd-001-3',
-        name: 'Educational Certificate',
-        iconName: 'school',
-        status: 'uploaded',
-        description: 'Last qualifying exam marksheet',
-      },
-      {
-        id: 'rd-001-4',
-        name: 'Bank Passbook',
-        iconName: 'bank',
-        status: 'verified',
-        description: 'Active bank account linked to Aadhaar',
-      },
-      {
-        id: 'rd-001-5',
-        name: 'Passport Size Photo',
-        iconName: 'camera-account',
-        status: 'uploaded',
-        description: 'Recent colour photograph on white background',
-      },
-      {
-        id: 'rd-001-6',
-        name: 'Caste Certificate',
-        iconName: 'file-certificate',
-        status: 'missing',
-        description: 'Required for SC / ST / OBC categories only',
-      },
-    ],
-    faqs: [
-      {
-        id: 'faq-001-1',
-        question: 'Can I apply for multiple scholarships simultaneously?',
-        answer:
-          'No, you can apply for only one Central Government scholarship per academic year through the National Scholarship Portal.',
-      },
-      {
-        id: 'faq-001-2',
-        question: 'When is the scholarship amount disbursed?',
-        answer:
-          "The scholarship amount is directly transferred to the student's bank account within 60 days after successful processing and verification.",
-      },
-      {
-        id: 'faq-001-3',
-        question: 'Is this scholarship renewable every year?',
-        answer:
-          'Yes, the scholarship is renewable annually provided the student maintains the required attendance and academic performance.',
-      },
-    ],
-    accentColor: '#4CAF50',
-    iconName: 'school',
-    tags: ['Education', 'Scholarship', 'Students', 'Central'],
-  },
-
-  // ── 2. PM Kisan ────────────────────────────────────────────────────────────
-  {
-    id: 'scheme-002',
-    title: 'Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)',
-    shortTitle: 'PM Kisan',
-    department: 'Department of Agriculture & Farmers Welfare',
-    ministry: 'Ministry of Agriculture & Farmers Welfare',
-    category: 'Agriculture',
-    type: 'Central',
-    description:
-      'PM-KISAN is a Central Sector Scheme providing income support to all landholding farmer families across India. Under this scheme, financial support of ₹6,000 per year is provided in three equal instalments of ₹2,000 each every four months, directly credited to the bank account.',
-    benefits: [
-      'Income support of ₹6,000 per year (₹2,000 per instalment)',
-      'Direct credit to bank account every 4 months',
-      'No middlemen — 100% Direct Benefit Transfer',
-      'Covers all land-holding farmers across India',
-      'Additional state government top-ups in select states',
-    ],
-    financialAssistance: '₹6,000 per annum (₹2,000 × 3 instalments)',
-    applicationPeriod: 'Rolling — apply anytime',
-    renewable: true,
-    renewalPeriod: 'Auto-renewed annually upon eKYC verification',
-    deadline: 'No fixed deadline',
-    processingTime: '45–90 working days',
-    applicationFee: 0,
-    officialPortal: 'https://pmkisan.gov.in',
-    eligibilityPercentage: 15,
-    eligibilityStatus: 'not_eligible',
-    eligibilityCriteria: [
-      {
-        id: 'ec-002-1',
-        label: 'Occupation',
-        required: 'Farmer / Agricultural Land Holder',
-        userValue: 'Self-Employed',
-        passed: false,
-        reason:
-          'This scheme is exclusively for farmers. Your occupation does not meet the eligibility criteria.',
-      },
-      {
-        id: 'ec-002-2',
-        label: 'Land Ownership',
-        required: 'Must own cultivable agricultural land',
-        userValue: 'Not a land owner',
-        passed: false,
-        reason: 'You must own agricultural land to be eligible for PM-KISAN.',
-      },
-      {
-        id: 'ec-002-3',
-        label: 'Indian Citizenship',
-        required: 'Indian Citizen',
-        userValue: 'Indian Citizen',
-        passed: true,
-      },
-      {
-        id: 'ec-002-4',
-        label: 'Age',
-        required: '18 years or above',
-        userValue: '28 years',
-        passed: true,
-      },
-    ],
-    requiredDocuments: [
-      { id: 'rd-002-1', name: 'Aadhaar Card', iconName: 'card-account-details', status: 'verified' },
-      {
-        id: 'rd-002-2',
-        name: 'Land Ownership Documents',
-        iconName: 'file-document-multiple',
-        status: 'missing',
-        description: 'Khasra / Khatauni or 7/12 extract',
-      },
-      { id: 'rd-002-3', name: 'Bank Passbook', iconName: 'bank', status: 'verified' },
-      {
-        id: 'rd-002-4',
-        name: 'Aadhaar-Linked Mobile Number',
-        iconName: 'cellphone',
-        status: 'verified',
-      },
-    ],
-    faqs: [
-      {
-        id: 'faq-002-1',
-        question: 'What is the instalment schedule for PM-KISAN?',
-        answer:
-          'The three instalments are released in April–July, August–November, and December–March each year.',
-      },
-      {
-        id: 'faq-002-2',
-        question: 'Can I apply online for PM-KISAN?',
-        answer:
-          'Yes, you can register online at pmkisan.gov.in or visit your nearest Common Service Centre (CSC).',
-      },
-    ],
-    accentColor: '#FF9800',
-    iconName: 'sprout',
-    tags: ['Agriculture', 'Farmers', 'Income Support', 'Central'],
-  },
-
-  // ── 3. Ayushman Bharat ────────────────────────────────────────────────────
-  {
-    id: 'scheme-003',
-    title: 'Ayushman Bharat — Pradhan Mantri Jan Arogya Yojana',
-    shortTitle: 'Ayushman Bharat',
-    department: 'National Health Authority',
-    ministry: 'Ministry of Health & Family Welfare',
-    category: 'Health',
-    type: 'Central',
-    description:
-      "Ayushman Bharat PM-JAY is the world's largest health assurance scheme, providing coverage of up to ₹5 lakh per family per year for secondary and tertiary care hospitalisation. Cashless treatment is available at any empanelled government or private hospital across India.",
+    schemeId: 'scheme-001',
+    title: 'Ayushman Bharat — Pradhan Mantri Jan Arogya Yojana (PM-JAY)',
+    subtitle: 'Universal Health Cover',
+    description: "Ayushman Bharat PM-JAY is the world's largest health assurance scheme, providing coverage of up to ₹5 lakh per family per year for secondary and tertiary care hospitalization. Cashless treatment is available at any empanelled public or private hospital across India.",
     benefits: [
       'Health cover of ₹5 lakh per family per year',
-      'Cashless treatment at empanelled hospitals',
-      'Pre-existing conditions covered from Day 1',
-      '1,929+ medical procedures covered',
-      'No cap on family size',
-      'Pre and post-hospitalisation expenses included',
-      'Transportation allowance provided',
+      'Cashless treatment at any empanelled public or private hospital',
+      'All pre-existing conditions covered from day one of enrollment',
+      'Covers room charges, doctor fee, OT fee, ICU charges, medicines, etc.'
     ],
-    financialAssistance: '₹5,00,000 per family per year (health insurance)',
-    applicationPeriod: 'Rolling — apply anytime',
+    eligibility: 'All families identified in Socio-Economic Caste Census (SECC) 2011 or registered with state health insurance cards.',
+    documentsRequired: ['Aadhaar Card', 'Ration Card', 'Income Certificate'],
+    incomeLimit: 'EWS',
+    gender: 'All',
+    ageRange: 'All',
+    occupation: 'Any',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2018-09-23',
+    applicationEnd: 'Permanent',
+    status: 'Active' as const,
+    officialWebsite: 'https://pmjay.gov.in',
+    officialApplyLink: 'https://beneficiary.nha.gov.in',
+    officialNotificationPDF: 'https://pmjay.gov.in/sites/default/files/2018-09/NHA_Guidelines.pdf',
+    ministry: 'Ministry of Health & Family Welfare',
+    launchYear: 2018,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 10,
+    requiredDocuments: ['Aadhaar Card', 'Ration Card'],
+    recommendedDocuments: ['Income Certificate'],
     renewable: true,
-    renewalPeriod: 'Annual renewal',
-    deadline: 'No fixed deadline',
-    processingTime: '7–15 working days',
-    applicationFee: 0,
-    officialPortal: 'https://pmjay.gov.in',
-    eligibilityPercentage: 92,
-    eligibilityStatus: 'eligible',
-    eligibilityCriteria: [
-      {
-        id: 'ec-003-1',
-        label: 'Annual Family Income',
-        required: 'Below ₹5,00,000',
-        userValue: '₹2,80,000',
-        passed: true,
-      },
-      {
-        id: 'ec-003-2',
-        label: 'Age',
-        required: '18 years or above',
-        userValue: '28 years',
-        passed: true,
-      },
-      {
-        id: 'ec-003-3',
-        label: 'Indian Citizenship',
-        required: 'Indian Citizen',
-        userValue: 'Indian Citizen',
-        passed: true,
-      },
-      {
-        id: 'ec-003-4',
-        label: 'Aadhaar Linkage',
-        required: 'Aadhaar linked to mobile',
-        userValue: 'Linked',
-        passed: true,
-      },
-    ],
-    requiredDocuments: [
-      {
-        id: 'rd-003-1',
-        name: 'Aadhaar Card',
-        iconName: 'card-account-details',
-        status: 'verified',
-      },
-      {
-        id: 'rd-003-2',
-        name: 'Ration Card / SECC Data',
-        iconName: 'file-document',
-        status: 'missing',
-        description: 'Socio-Economic Caste Census 2011 data or ration card',
-      },
-      {
-        id: 'rd-003-3',
-        name: 'Income Certificate',
-        iconName: 'currency-inr',
-        status: 'missing',
-        description: 'Required if not covered under SECC',
-      },
-      {
-        id: 'rd-003-4',
-        name: 'Passport Size Photo',
-        iconName: 'camera-account',
-        status: 'uploaded',
-      },
-      {
-        id: 'rd-003-5',
-        name: 'Aadhaar-Linked Mobile Number',
-        iconName: 'cellphone',
-        status: 'verified',
-      },
-    ],
-    faqs: [
-      {
-        id: 'faq-003-1',
-        question: 'Can I get treatment at any hospital?',
-        answer:
-          'You can get cashless treatment at any empanelled government or private hospital. Check the hospital list on the PMJAY website or mobile app.',
-      },
-      {
-        id: 'faq-003-2',
-        question: 'Is the ₹5 lakh limit per person or per family?',
-        answer:
-          'The ₹5 lakh limit is per family per year. The same pool can be used by any member of the family.',
-      },
-      {
-        id: 'faq-003-3',
-        question: 'Are pre-existing diseases covered?',
-        answer:
-          'Yes, all pre-existing conditions are covered from Day 1 with no waiting period whatsoever.',
-      },
-    ],
-    accentColor: '#F44336',
-    iconName: 'hospital-box',
     tags: ['Health', 'Insurance', 'Medical', 'Central', 'Cashless'],
+    category: 'Health',
+    subcategory: 'Health Insurance',
+    name: 'Ayushman Bharat — Pradhan Mantri Jan Arogya Yojana (PM-JAY)',
+    shortDescription: 'Universal Health Cover of up to ₹5 lakh per family per year.',
+    fullDescription: "Ayushman Bharat PM-JAY is the world's largest health assurance scheme, providing coverage of up to ₹5 lakh per family per year for secondary and tertiary care hospitalization.",
+    targetAudience: 'Economically weaker sections and low-income families',
+    minAge: 0,
+    maxAge: undefined,
+    studentEligible: true,
+    farmerEligible: true,
+    seniorCitizenEligible: true,
+    disabledEligible: true
   },
-
-  // ── 4. PM Awas Yojana ─────────────────────────────────────────────────────
   {
-    id: 'scheme-004',
-    title: 'Pradhan Mantri Awas Yojana — Urban (PMAY-U)',
-    shortTitle: 'PM Awas Yojana',
-    department: 'Ministry of Housing & Urban Affairs',
-    ministry: 'Ministry of Housing & Urban Affairs',
-    category: 'Housing',
-    type: 'Central',
-    description:
-      'PMAY-U provides financial assistance for construction and purchase of affordable houses to eligible urban households. The scheme aims to provide housing to all eligible families from EWS, LIG, and MIG categories through Credit Linked Subsidy Scheme (CLSS) and direct central assistance.',
+    schemeId: 'scheme-002',
+    title: 'Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)',
+    subtitle: 'Income Support for Farmers',
+    description: 'A Central Sector Scheme providing income support to all landholding farmer families across the country to enable them to take care of expenses related to agriculture and domestic needs.',
     benefits: [
-      'Interest subsidy up to 6.5% on housing loans',
-      'Credit Linked Subsidy up to ₹2.67 lakh (EWS/LIG)',
-      'Loan subsidies for amounts up to ₹12 lakh (MIG-I)',
-      'Loan subsidies for amounts up to ₹18 lakh (MIG-II)',
-      'Direct Central Assistance of ₹1.5 lakh (EWS/LIG)',
+      'Financial benefit of ₹6,000 per year',
+      'Disbursed in three equal installments of ₹2,000 every four months',
+      'Direct Benefit Transfer directly into the bank accounts of farmers'
     ],
-    financialAssistance: 'Credit Linked Subsidy: ₹1,50,000 – ₹2,67,280',
-    applicationPeriod: 'December 2024 – March 2027',
-    renewable: false,
-    deadline: 'Dec 31, 2026',
-    processingTime: '60–90 working days',
-    applicationFee: 0,
-    officialPortal: 'https://pmaymis.gov.in',
-    eligibilityPercentage: 88,
-    eligibilityStatus: 'eligible',
-    eligibilityCriteria: [
-      {
-        id: 'ec-004-1',
-        label: 'Age',
-        required: '21 years or above',
-        userValue: '28 years',
-        passed: true,
-      },
-      {
-        id: 'ec-004-2',
-        label: 'Annual Family Income',
-        required: 'Below ₹18,00,000 (MIG-II)',
-        userValue: '₹2,80,000 (EWS eligible)',
-        passed: true,
-      },
-      {
-        id: 'ec-004-3',
-        label: 'Existing House Ownership',
-        required: "No pucca house in applicant's or spouse's name",
-        userValue: 'No existing house',
-        passed: true,
-      },
-      {
-        id: 'ec-004-4',
-        label: 'Indian Citizenship',
-        required: 'Indian Citizen',
-        userValue: 'Indian Citizen',
-        passed: true,
-      },
-    ],
-    requiredDocuments: [
-      { id: 'rd-004-1', name: 'Aadhaar Card', iconName: 'card-account-details', status: 'verified' },
-      { id: 'rd-004-2', name: 'PAN Card', iconName: 'card-text', status: 'verified' },
-      {
-        id: 'rd-004-3',
-        name: 'Income Certificate',
-        iconName: 'file-document',
-        status: 'missing',
-        description: 'Proof of annual family income',
-      },
-      {
-        id: 'rd-004-4',
-        name: 'Self-Declaration (No House)',
-        iconName: 'file-sign',
-        status: 'missing',
-        description: 'Affidavit that no pucca house is owned',
-      },
-      { id: 'rd-004-5', name: 'Bank Passbook', iconName: 'bank', status: 'verified' },
-      {
-        id: 'rd-004-6',
-        name: 'Residence Certificate',
-        iconName: 'home-city',
-        status: 'uploaded',
-      },
-      {
-        id: 'rd-004-7',
-        name: 'Passport Size Photo',
-        iconName: 'camera-account',
-        status: 'uploaded',
-      },
-    ],
-    faqs: [
-      {
-        id: 'faq-004-1',
-        question: 'Who is eligible under the EWS category?',
-        answer:
-          'Households with annual income up to ₹3 lakh fall under the Economically Weaker Section (EWS) category and receive the maximum subsidy benefit.',
-      },
-      {
-        id: 'faq-004-2',
-        question: 'Can a single woman apply for PMAY?',
-        answer:
-          'Yes. For EWS and LIG categories, the house must be in the name of the female head of the household or jointly with the male head.',
-      },
-      {
-        id: 'faq-004-3',
-        question: 'How long does the interest subsidy last?',
-        answer:
-          'The subsidy is applicable for the loan tenure or 20 years, whichever is lower, and is credited upfront to the loan account.',
-      },
-    ],
-    accentColor: '#2196F3',
-    iconName: 'home-city',
-    tags: ['Housing', 'Subsidy', 'Urban', 'Central', 'EWS', 'LIG'],
-  },
-
-  // ── 5. Skill India ────────────────────────────────────────────────────────
-  {
-    id: 'scheme-005',
-    title: 'Pradhan Mantri Kaushal Vikas Yojana (PMKVY 4.0)',
-    shortTitle: 'Skill India',
-    department: 'National Skill Development Corporation',
-    ministry: 'Ministry of Skill Development & Entrepreneurship',
-    category: 'Skill Development',
-    type: 'Central',
-    description:
-      'PMKVY is the flagship scheme of the Ministry of Skill Development & Entrepreneurship. Free skill training and certification is provided to youth to help them take up industry-relevant job roles that improve their livelihood and employment opportunities across 35+ sectors.',
-    benefits: [
-      'Free skill training in 300+ job roles',
-      'Monetary reward upon successful certification',
-      'Government-recognised NSQF-linked certificate',
-      'Placement assistance post-training',
-      'Post-placement support for 3 months',
-      '₹8,000 stipend during training (residential batches)',
-    ],
-    financialAssistance: 'Free training + Monetary reward up to ₹8,000',
-    applicationPeriod: 'Rolling — batches available year-round',
-    renewable: false,
-    deadline: 'Mar 31, 2027',
-    processingTime: '3–6 months (training + certification)',
-    applicationFee: 0,
-    officialPortal: 'https://pmkvyofficial.org',
-    eligibilityPercentage: 95,
-    eligibilityStatus: 'eligible',
-    eligibilityCriteria: [
-      {
-        id: 'ec-005-1',
-        label: 'Age',
-        required: '15–45 years',
-        userValue: '28 years',
-        passed: true,
-      },
-      {
-        id: 'ec-005-2',
-        label: 'Indian Citizenship',
-        required: 'Indian Citizen',
-        userValue: 'Indian Citizen',
-        passed: true,
-      },
-      {
-        id: 'ec-005-3',
-        label: 'Aadhaar Enrollment',
-        required: 'Aadhaar enrolled',
-        userValue: 'Aadhaar verified',
-        passed: true,
-      },
-      {
-        id: 'ec-005-4',
-        label: 'Employment Status',
-        required: 'Unemployed / Under-employed / School dropout',
-        userValue: 'Self-Employed',
-        passed: true,
-      },
-    ],
-    requiredDocuments: [
-      { id: 'rd-005-1', name: 'Aadhaar Card', iconName: 'card-account-details', status: 'verified' },
-      {
-        id: 'rd-005-2',
-        name: 'Educational Certificate',
-        iconName: 'school',
-        status: 'uploaded',
-        description: 'Last qualification certificate',
-      },
-      {
-        id: 'rd-005-3',
-        name: 'Passport Size Photo',
-        iconName: 'camera-account',
-        status: 'uploaded',
-      },
-      { id: 'rd-005-4', name: 'Bank Passbook', iconName: 'bank', status: 'verified' },
-    ],
-    faqs: [
-      {
-        id: 'faq-005-1',
-        question: 'How do I find a training centre near me?',
-        answer:
-          'Visit the PMKVY website or the Skill India portal to find a Training Partner near you by entering your pin code or district.',
-      },
-      {
-        id: 'faq-005-2',
-        question: 'Is the certificate recognised by employers?',
-        answer:
-          'Yes, PMKVY certificates are NSDC-recognised and linked to the National Skills Qualification Framework (NSQF) which is accepted across industries.',
-      },
-      {
-        id: 'faq-005-3',
-        question: 'Can I choose any skill sector?',
-        answer:
-          'Yes, you can choose from 35+ sectors including IT, Healthcare, Construction, Retail, Hospitality, and many more.',
-      },
-    ],
-    accentColor: '#9C27B0',
-    iconName: 'school',
-    tags: ['Skills', 'Training', 'Youth', 'Central', 'Employment'],
-  },
-
-  // ── 6. Digital India Internship ───────────────────────────────────────────
-  {
-    id: 'scheme-006',
-    title: 'Digital India Internship Scheme (DIIS)',
-    shortTitle: 'Digital India Internship',
-    department: 'Ministry of Electronics & Information Technology',
-    ministry: 'Ministry of Electronics & Information Technology',
-    category: 'Technology',
-    type: 'Central',
-    description:
-      'The Digital India Internship Scheme offers students and graduates an opportunity to work with Government of India Ministries and Departments for 2 months. Interns gain hands-on experience in e-governance, policy formulation, and digital transformation initiatives at a national level.',
-    benefits: [
-      'Stipend of ₹10,000 per month (₹20,000 total)',
-      'Practical experience in government IT projects',
-      'Certificate from Ministry of Electronics & IT',
-      'Exposure to national-level digital initiatives',
-      'Mentorship from senior government officials',
-      'Letter of recommendation on successful completion',
-    ],
-    financialAssistance: '₹10,000/month stipend for 2 months',
-    applicationPeriod: 'Twice a year — Jan–Feb and Jul–Aug',
-    renewable: false,
-    deadline: 'Aug 15, 2026',
-    processingTime: '15–30 working days',
-    applicationFee: 0,
-    officialPortal: 'https://internship.meity.gov.in',
-    eligibilityPercentage: 90,
-    eligibilityStatus: 'eligible',
-    eligibilityCriteria: [
-      {
-        id: 'ec-006-1',
-        label: 'Age',
-        required: '18–30 years',
-        userValue: '28 years',
-        passed: true,
-      },
-      {
-        id: 'ec-006-2',
-        label: 'Education',
-        required: 'Pursuing or completed UG / PG degree',
-        userValue: 'Graduate',
-        passed: true,
-      },
-      {
-        id: 'ec-006-3',
-        label: 'Indian Citizenship',
-        required: 'Indian Citizen',
-        userValue: 'Indian Citizen',
-        passed: true,
-      },
-      {
-        id: 'ec-006-4',
-        label: 'Academic Performance',
-        required: '60% or above in last qualifying exam',
-        userValue: 'Assumed to be met',
-        passed: true,
-      },
-    ],
-    requiredDocuments: [
-      { id: 'rd-006-1', name: 'Aadhaar Card', iconName: 'card-account-details', status: 'verified' },
-      {
-        id: 'rd-006-2',
-        name: 'Educational Certificate / Marksheet',
-        iconName: 'school',
-        status: 'uploaded',
-      },
-      {
-        id: 'rd-006-3',
-        name: 'Resume / CV',
-        iconName: 'file-account',
-        status: 'missing',
-        description: 'Updated resume (maximum 2 pages)',
-      },
-      {
-        id: 'rd-006-4',
-        name: 'Passport Size Photo',
-        iconName: 'camera-account',
-        status: 'uploaded',
-      },
-      { id: 'rd-006-5', name: 'Bank Passbook', iconName: 'bank', status: 'verified' },
-      {
-        id: 'rd-006-6',
-        name: 'College ID / NOC',
-        iconName: 'badge-account',
-        status: 'missing',
-        description: 'Required if currently pursuing degree',
-      },
-    ],
-    faqs: [
-      {
-        id: 'faq-006-1',
-        question: 'Is the internship remote or on-site?',
-        answer:
-          'The internship is primarily on-site at Ministry offices in New Delhi, with some departments offering hybrid arrangements.',
-      },
-      {
-        id: 'faq-006-2',
-        question: 'How are interns selected?',
-        answer:
-          'Selection is based on academic merit, statement of purpose, and shortlisting by the respective Ministry or Department.',
-      },
-      {
-        id: 'faq-006-3',
-        question: 'Can I apply to multiple departments?',
-        answer: 'Yes, you can apply to a maximum of 3 departments in one application cycle.',
-      },
-    ],
-    accentColor: '#00BCD4',
-    iconName: 'laptop',
-    tags: ['Technology', 'Internship', 'Youth', 'IT', 'Central'],
-  },
-
-  // ── 7. Ladli Scheme ───────────────────────────────────────────────────────
-  {
-    id: 'scheme-007',
-    title: 'Ladli Laxmi Yojana',
-    shortTitle: 'Ladli Scheme',
-    department: 'Department of Women & Child Development',
-    ministry: 'Ministry of Women & Child Development',
-    category: 'Women & Child',
-    type: 'State',
-    state: 'Madhya Pradesh',
-    description:
-      'Ladli Laxmi Yojana is a Madhya Pradesh state government scheme for the welfare and empowerment of the girl child. National Savings Certificates worth ₹1,43,000 are deposited in the name of the girl child over 5 years, with additional scholarship and marriage assistance milestones.',
-    benefits: [
-      'NSC investment of ₹1,43,000 over 5 years',
-      '₹2,000 scholarship at Class 6 admission',
-      '₹4,000 scholarship at Class 9 admission',
-      '₹6,000 scholarship at Class 11 and 12 admission',
-      '₹25,000 at 12th standard passing',
-      '₹1,00,000 at age 21 upon graduation and marriage',
-    ],
-    financialAssistance: '₹1,43,000 phased disbursement over 21 years',
-    applicationPeriod: 'Within 1 year of birth',
-    renewable: false,
-    deadline: 'Registration within 1 year of birth',
-    processingTime: '30–45 working days',
-    applicationFee: 0,
-    officialPortal: 'https://ladlilaxmi.mp.gov.in',
-    eligibilityPercentage: 0,
-    eligibilityStatus: 'not_eligible',
-    eligibilityCriteria: [
-      {
-        id: 'ec-007-1',
-        label: 'Gender',
-        required: 'Female (Girl Child)',
-        userValue: 'Male',
-        passed: false,
-        reason: 'This scheme is exclusively for girl children. Your gender does not qualify.',
-      },
-      {
-        id: 'ec-007-2',
-        label: 'State of Residence',
-        required: 'Madhya Pradesh',
-        userValue: 'Maharashtra',
-        passed: false,
-        reason: 'This is a Madhya Pradesh state scheme. Residents of Maharashtra are not eligible.',
-      },
-      {
-        id: 'ec-007-3',
-        label: 'Age at Registration',
-        required: 'Below 1 year (at registration)',
-        userValue: '28 years',
-        passed: false,
-        reason: "Registration must happen within 1 year of the girl child's birth.",
-      },
-    ],
-    requiredDocuments: [
-      {
-        id: 'rd-007-1',
-        name: 'Birth Certificate',
-        iconName: 'certificate',
-        status: 'missing',
-      },
-      {
-        id: 'rd-007-2',
-        name: 'Aadhaar Card (Parent)',
-        iconName: 'card-account-details',
-        status: 'verified',
-      },
-      {
-        id: 'rd-007-3',
-        name: 'MP Residence Certificate',
-        iconName: 'home-city',
-        status: 'missing',
-      },
-      { id: 'rd-007-4', name: 'Bank Passbook', iconName: 'bank', status: 'verified' },
-    ],
-    faqs: [
-      {
-        id: 'faq-007-1',
-        question: 'Is this scheme available in all states?',
-        answer:
-          'No, Ladli Laxmi Yojana is a Madhya Pradesh state scheme. Other states have similar programs like Ladli Behna (MP) or Beti Bachao Beti Padhao (Central).',
-      },
-      {
-        id: 'faq-007-2',
-        question: 'When can the final ₹1,00,000 be withdrawn?',
-        answer:
-          "The final amount is payable when the girl child turns 21, provided she has passed Class 12 and has not married before age 18.",
-      },
-    ],
-    accentColor: '#E91E63',
-    iconName: 'human-female',
-    tags: ['Women', 'Girl Child', 'State', 'MP', 'Education'],
-  },
-
-  // ── 8. National Pension Scheme ────────────────────────────────────────────
-  {
-    id: 'scheme-008',
-    title: 'National Pension System (NPS) — All Citizen Model',
-    shortTitle: 'National Pension Scheme',
-    department: 'Pension Fund Regulatory & Development Authority',
-    ministry: 'Ministry of Finance',
-    category: 'Pension',
-    type: 'Central',
-    description:
-      'The National Pension System (NPS) is a voluntary, defined contribution retirement savings scheme regulated by PFRDA. Any Indian citizen between 18–70 years can open an NPS account, invest across equity, corporate bonds, and government securities, and enjoy significant tax benefits under multiple sections.',
-    benefits: [
-      'Market-linked returns (historically 8–10% p.a.)',
-      'Tax deduction up to ₹1.5 lakh under Section 80C',
-      'Additional ₹50,000 deduction under Section 80CCD(1B)',
-      'Portable across jobs and locations nationwide',
-      'Choice of Pension Fund Manager and investment mix',
-      'Partial withdrawal allowed after 3 years',
-    ],
-    financialAssistance: 'Retirement corpus + tax savings (market-linked)',
-    applicationPeriod: 'Open year-round',
+    eligibility: 'All landholding farmer families holding cultivable agricultural land in their name.',
+    documentsRequired: ['Aadhaar Card', 'Land Ownership Documents', 'Bank Passbook'],
+    incomeLimit: 'All',
+    gender: 'All',
+    ageRange: '18-120',
+    occupation: 'Farmer',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2018-12-01',
+    applicationEnd: 'Permanent',
+    status: 'Active' as const,
+    officialWebsite: 'https://pmkisan.gov.in',
+    officialApplyLink: 'https://pmkisan.gov.in/RegistrationFormNew.aspx',
+    officialNotificationPDF: 'https://pmkisan.gov.in/Documents/Guidelines.pdf',
+    ministry: 'Ministry of Agriculture & Farmers Welfare',
+    launchYear: 2019,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 9,
+    requiredDocuments: ['Aadhaar Card', 'Land Ownership Documents', 'Bank Passbook'],
+    recommendedDocuments: [],
     renewable: true,
-    renewalPeriod: 'Annual contribution required',
-    deadline: 'No deadline — enrol anytime',
-    processingTime: '3–7 working days',
-    applicationFee: 0,
-    officialPortal: 'https://enps.nsdl.com',
-    eligibilityPercentage: 85,
-    eligibilityStatus: 'eligible',
-    eligibilityCriteria: [
-      {
-        id: 'ec-008-1',
-        label: 'Age',
-        required: '18–70 years',
-        userValue: '28 years',
-        passed: true,
-      },
-      {
-        id: 'ec-008-2',
-        label: 'Indian Citizenship',
-        required: 'Indian Citizen (Resident / NRI / OCI)',
-        userValue: 'Indian Citizen',
-        passed: true,
-      },
-      {
-        id: 'ec-008-3',
-        label: 'Aadhaar & PAN',
-        required: 'Valid Aadhaar and PAN card',
-        userValue: 'Both verified',
-        passed: true,
-      },
-      {
-        id: 'ec-008-4',
-        label: 'KYC Compliance',
-        required: 'KYC documents must be valid and current',
-        userValue: 'KYC documents available',
-        passed: true,
-      },
-    ],
-    requiredDocuments: [
-      {
-        id: 'rd-008-1',
-        name: 'Aadhaar Card',
-        iconName: 'card-account-details',
-        status: 'verified',
-      },
-      { id: 'rd-008-2', name: 'PAN Card', iconName: 'card-text', status: 'verified' },
-      {
-        id: 'rd-008-3',
-        name: 'Bank Passbook / Cancelled Cheque',
-        iconName: 'bank',
-        status: 'verified',
-      },
-      {
-        id: 'rd-008-4',
-        name: 'Passport Size Photo',
-        iconName: 'camera-account',
-        status: 'uploaded',
-      },
-      {
-        id: 'rd-008-5',
-        name: 'Residence Proof',
-        iconName: 'home-city',
-        status: 'uploaded',
-      },
-    ],
-    faqs: [
-      {
-        id: 'faq-008-1',
-        question: 'What is the minimum contribution per year?',
-        answer:
-          'For Tier I (mandatory) account, the minimum is ₹500 per transaction and ₹1,000 per year. For Tier II (voluntary), the minimum is ₹250.',
-      },
-      {
-        id: 'faq-008-2',
-        question: 'When can I withdraw my NPS corpus?',
-        answer:
-          'Full withdrawal is allowed at age 60. At least 40% of the corpus must be used to buy an annuity; the remaining 60% can be withdrawn as a lump sum.',
-      },
-      {
-        id: 'faq-008-3',
-        question: 'Can I change my Fund Manager later?',
-        answer:
-          'Yes, you can change your Pension Fund Manager or investment allocation once per year through the CRA portal online.',
-      },
-    ],
-    accentColor: '#607D8B',
-    iconName: 'piggy-bank',
-    tags: ['Pension', 'Retirement', 'Tax Benefits', 'Central', 'Investment'],
+    tags: ['Agriculture', 'Farmers', 'Income Support', 'Central'],
+    category: 'Agriculture',
+    subcategory: 'Income Support',
+    name: 'Pradhan Mantri Kisan Samman Nidhi',
+    shortDescription: 'Income support of ₹6,000 per year for landholding farmer families.',
+    fullDescription: 'A Central Sector Scheme providing income support to all landholding farmer families across the country.',
+    targetAudience: 'Landholding farmers',
+    minAge: 18,
+    maxAge: undefined,
+    studentEligible: false,
+    farmerEligible: true,
+    seniorCitizenEligible: true,
+    disabledEligible: true
   },
+=======
+    eligibility: 'All landholding farmer families holding cultivable agricultural land in their name.',
+    documentsRequired: ['Aadhaar Card', 'Land Ownership Documents', 'Bank Passbook'],
+    incomeLimit: 'All',
+    gender: 'All',
+    ageRange: '18-120',
+    occupation: 'Farmer',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2018-12-01',
+    applicationEnd: 'Permanent',
+    status: 'Active' as const,
+    officialWebsite: 'https://pmkisan.gov.in',
+    officialApplyLink: 'https://pmkisan.gov.in/RegistrationFormNew.aspx',
+    officialNotificationPDF: 'https://pmkisan.gov.in/Documents/Guidelines.pdf',
+    ministry: 'Ministry of Agriculture & Farmers Welfare',
+    launchYear: 2019,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 9,
+    requiredDocuments: ['Aadhaar Card', 'Land Ownership Documents', 'Bank Passbook'],
+    recommendedDocuments: [],
+>>>>>>> 30fe4f6 (The Scheme has been created successfully)
+    renewable: true,
+    tags: ['Agriculture', 'Farmers', 'Income Support', 'Central'],
+    category: 'Agriculture',
+    subcategory: 'Income Support',
+    name: 'Pradhan Mantri Kisan Samman Nidhi',
+    shortDescription: 'Income support of ₹6,000 per year for landholding farmer families.',
+    fullDescription: 'A Central Sector Scheme providing income support to all landholding farmer families across the country.',
+    targetAudience: 'Landholding farmers',
+    minAge: 18,
+    maxAge: undefined,
+    studentEligible: false,
+    farmerEligible: true,
+    seniorCitizenEligible: true,
+    disabledEligible: true
+  },
+  {
+    schemeId: 'scheme-003',
+    title: 'Pradhan Mantri Awas Yojana — Urban (PMAY-U)',
+    subtitle: 'Affordable Housing Mission',
+    description: 'A flagship mission of the Government of India implemented by the Ministry of Housing and Urban Affairs (MoHUA) which addresses urban housing shortage among the EWS/LIG and MIG categories.',
+    benefits: [
+      'Interest subsidy of up to 6.5% on housing loans',
+      'Subsidy amount of up to ₹2.67 lakh directly credited to loan account',
+      'Preference given to female ownership or co-ownership of the property'
+    ],
+    eligibility: 'Families with annual income up to ₹18 lakh who do not own a pucca house anywhere in India.',
+    documentsRequired: ['Aadhaar Card', 'PAN Card', 'Income Certificate', 'Affidavit of No Pucca House'],
+    incomeLimit: 'MIG',
+    gender: 'All',
+    ageRange: '18-120',
+    occupation: 'Any',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2015-06-25',
+    applicationEnd: '2026-12-31',
+    status: 'Active' as const,
+    officialWebsite: 'https://pmaymis.gov.in',
+    officialApplyLink: 'https://pmaymis.gov.in/Open/Application_Form.aspx',
+    officialNotificationPDF: 'https://pmaymis.gov.in/PDF/Guidelines.pdf',
+    ministry: 'Ministry of Housing & Urban Affairs',
+    launchYear: 2015,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 8,
+    requiredDocuments: ['Aadhaar Card', 'PAN Card', 'Income Certificate'],
+    recommendedDocuments: ['Affidavit of No Pucca House'],
+    renewable: false,
+    tags: ['Housing', 'Urban', 'Subsidy', 'Central'],
+    category: 'Housing',
+    subcategory: 'Affordable Housing',
+    name: 'Pradhan Mantri Awas Yojana — Urban',
+    shortDescription: 'Financial assistance and interest subsidies for urban home buyers.',
+    fullDescription: 'A flagship mission of the Government of India which addresses urban housing shortage.',
+    targetAudience: 'Urban households without pucca houses',
+    minAge: 18,
+    maxAge: undefined,
+    studentEligible: false,
+    farmerEligible: true,
+    seniorCitizenEligible: true,
+    disabledEligible: true
+  },
+  {
+    schemeId: 'scheme-004',
+    title: 'Sukanya Samriddhi Yojana (SSY)',
+    subtitle: 'Girl Child Savings',
+    description: 'A small deposit scheme for the girl child launched as part of the "Beti Bachao Beti Padhao" campaign, offering high interest rates and tax exemptions.',
+    benefits: [
+      'High interest rate on savings (currently 8.2% per annum)',
+      'Triple tax benefits: Section 80C deduction, tax-free interest, tax-free maturity',
+      'Account matures on completion of 21 years or upon girl child\'s marriage after age 18'
+    ],
+    eligibility: 'Parents or legal guardians of a girl child aged below 10 years. Maximum two accounts per household.',
+    documentsRequired: ['Birth Certificate of girl child', 'Aadhaar Card of Parent', 'PAN Card of Parent'],
+    incomeLimit: 'All',
+    gender: 'Female',
+    ageRange: '0-10',
+    occupation: 'Any',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Offline' as const,
+    applicationStart: '2015-01-22',
+    applicationEnd: 'Permanent',
+    status: 'Active' as const,
+    officialWebsite: 'https://www.nsiindia.gov.in',
+    officialApplyLink: 'https://www.indiapost.gov.in',
+    officialNotificationPDF: 'https://www.nsiindia.gov.in/InternalPage.aspx?Id_Pk=223',
+    ministry: 'Ministry of Finance',
+    launchYear: 2015,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 9,
+    requiredDocuments: ['Birth Certificate of girl child', 'Aadhaar Card of Parent'],
+    recommendedDocuments: ['PAN Card of Parent'],
+    renewable: false,
+    tags: ['Women', 'Girl Child', 'Savings', 'Central'],
+    category: 'Women',
+    subcategory: 'Savings Scheme',
+    name: 'Sukanya Samriddhi Yojana',
+    shortDescription: 'High-interest savings account for girl children under 10 years.',
+    fullDescription: 'A small deposit scheme for the girl child offering high interest rates and tax exemptions.',
+    targetAudience: 'Parents of girl children under 10',
+    minAge: 0,
+    maxAge: 10,
+    studentEligible: true,
+    farmerEligible: true,
+    seniorCitizenEligible: false,
+    disabledEligible: true
+  },
+  {
+    schemeId: 'scheme-005',
+    title: 'Atal Pension Yojana (APY)',
+    subtitle: 'Social Security Pension',
+    description: 'A pension scheme focused on the unorganized sector workers, providing a guaranteed minimum pension of ₹1,000 to ₹5,000 per month after the age of 60 years.',
+    benefits: [
+      'Guaranteed minimum pension of ₹1,000, ₹2,000, ₹3,000, ₹4,000 or ₹5,000 per month from age 60',
+      'In case of death, the same pension is guaranteed to the spouse for life',
+      'On death of both subscriber and spouse, the entire pension corpus is returned to the nominee'
+    ],
+    eligibility: 'All citizens of India between 18 and 40 years who hold a bank account and are not members of any statutory social security schemes or income taxpayers.',
+    documentsRequired: ['Aadhaar Card', 'Bank Passbook'],
+    incomeLimit: 'All',
+    gender: 'All',
+    ageRange: '18-40',
+    occupation: 'Unorganized Worker',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Both' as const,
+    applicationStart: '2015-06-01',
+    applicationEnd: 'Permanent',
+    status: 'Active' as const,
+    officialWebsite: 'https://www.npscra.nsdl.co.in',
+    officialApplyLink: 'https://www.npscra.nsdl.co.in/scheme-details.php',
+    officialNotificationPDF: 'https://www.npscra.nsdl.co.in/download/Atal-Pension-Yojana-Rules.pdf',
+    ministry: 'Ministry of Finance',
+    launchYear: 2015,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 8,
+    requiredDocuments: ['Aadhaar Card', 'Bank Passbook'],
+    recommendedDocuments: [],
+    renewable: true,
+    tags: ['Pension', 'Retirement', 'Social Security', 'Central'],
+    category: 'Pension',
+    subcategory: 'Social Security',
+    name: 'Atal Pension Yojana',
+    shortDescription: 'Guaranteed pension of ₹1,000 to ₹5,000/month after age 60.',
+    fullDescription: 'A pension scheme focused on the unorganized sector workers.',
+    targetAudience: 'Unorganized sector workers aged 18 to 40',
+    minAge: 18,
+    maxAge: 40,
+    studentEligible: false,
+    farmerEligible: true,
+    seniorCitizenEligible: false,
+    disabledEligible: true
+  },
+  {
+    schemeId: 'scheme-006',
+    title: 'Pradhan Mantri Suraksha Bima Yojana (PMSBY)',
+    subtitle: 'Low-Cost Accident Insurance',
+    description: 'An accident insurance scheme offering high coverage at a nominal premium, accessible to all bank account holders.',
+    benefits: [
+      'Accidental death cover of ₹2 lakh for a premium of just ₹20 per year',
+      'Total and irrecoverable loss of both eyes or loss of use of both hands or feet cover of ₹2 lakh',
+      'Loss of one eye or loss of use of one hand or foot cover of ₹1 lakh'
+    ],
+    eligibility: 'All bank account holders between 18 and 70 years of age.',
+    documentsRequired: ['Aadhaar Card', 'Bank Passbook'],
+    incomeLimit: 'All',
+    gender: 'All',
+    ageRange: '18-70',
+    occupation: 'Any',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2015-05-09',
+    applicationEnd: 'Permanent',
+    status: 'Active' as const,
+    officialWebsite: 'https://www.jansuraksha.gov.in',
+    officialApplyLink: 'https://www.jansuraksha.gov.in/Forms-PMSBY.aspx',
+    officialNotificationPDF: 'https://www.jansuraksha.gov.in/PMSBY-Rules.pdf',
+    ministry: 'Ministry of Finance',
+    launchYear: 2015,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 7,
+    requiredDocuments: ['Aadhaar Card', 'Bank Passbook'],
+    recommendedDocuments: [],
+    renewable: true,
+    tags: ['Insurance', 'Accident Cover', 'Financial Security', 'Central'],
+    category: 'Insurance',
+    subcategory: 'Accident Insurance',
+    name: 'Pradhan Mantri Suraksha Bima Yojana',
+    shortDescription: 'Low-cost accident insurance cover of ₹2 lakh for ₹20/year.',
+    fullDescription: 'An accident insurance scheme offering high coverage at a nominal premium.',
+    targetAudience: 'Bank account holders aged 18 to 70',
+    minAge: 18,
+    maxAge: 70,
+    studentEligible: true,
+    farmerEligible: true,
+    seniorCitizenEligible: true,
+    disabledEligible: true
+  },
+  {
+    schemeId: 'scheme-007',
+    title: 'Pradhan Mantri Kaushal Vikas Yojana (PMKVY 4.0)',
+    subtitle: 'Skill Training & Certification',
+    description: 'The flagship outcome-based skill training scheme of MSDE aiming to enable a large number of Indian youth to take up industry-relevant skill training.',
+    benefits: [
+      'Free industry-relevant skill training in over 300 job roles',
+      'Stipend of up to ₹8,000 upon successful completion and certification',
+      'NSQF-aligned government certification and job placement assistance'
+    ],
+    eligibility: 'Unemployed youth, school or college dropouts with a valid Aadhaar and bank account.',
+    documentsRequired: ['Aadhaar Card', 'Education Certificate', 'Bank Passbook'],
+    incomeLimit: 'All',
+    gender: 'All',
+    ageRange: '15-45',
+    occupation: 'Student',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2015-07-16',
+    applicationEnd: '2027-03-31',
+    status: 'Active' as const,
+    officialWebsite: 'https://www.pmkvyofficial.org',
+    officialApplyLink: 'https://www.skillindia.gov.in',
+    officialNotificationPDF: 'https://www.pmkvyofficial.org/App_Documents/Guidelines/PMKVY-Guidelines.pdf',
+    ministry: 'Ministry of Skill Development & Entrepreneurship',
+    launchYear: 2015,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 8,
+    requiredDocuments: ['Aadhaar Card', 'Education Certificate'],
+    recommendedDocuments: ['Bank Passbook'],
+    renewable: false,
+    tags: ['Skill Development', 'Training', 'Youth', 'Employment', 'Central'],
+    category: 'Skill Development',
+    subcategory: 'Employment & Training',
+    name: 'Pradhan Mantri Kaushal Vikas Yojana (PMKVY 4.0)',
+    shortDescription: 'Free skill training and NSQF certification for Indian youth.',
+    fullDescription: 'The flagship outcome-based skill training scheme of MSDE.',
+    targetAudience: 'Unemployed youth and school dropouts',
+    minAge: 15,
+    maxAge: 45,
+    studentEligible: true,
+    farmerEligible: true,
+    seniorCitizenEligible: false,
+    disabledEligible: true
+  },
+  {
+    schemeId: 'scheme-008',
+    title: 'Digital India Internship Scheme (DIIS)',
+    subtitle: 'Government IT Internship',
+    description: 'An opportunity for students pursuing computer/IT/engineering degrees to intern with MeitY and work on national e-governance policies and systems.',
+    benefits: [
+      'Monthly stipend of ₹10,000 for 2 months',
+      'Valuable certificate from Ministry of Electronics & Information Technology (MeitY) upon completion',
+      'Direct exposure to policy making and digital transformation projects'
+    ],
+    eligibility: 'Indian students pursuing BE/B.Tech/MCA/M.Sc (IT) with minimum 60% marks in qualifying exams.',
+    documentsRequired: ['Aadhaar Card', 'Education Certificate', 'College ID / NOC'],
+    incomeLimit: 'All',
+    gender: 'All',
+    ageRange: '18-28',
+    occupation: 'Student',
+    education: 'Graduate',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2018-05-15',
+    applicationEnd: '2026-09-30',
+    status: 'Active' as const,
+    officialWebsite: 'https://internship.meity.gov.in',
+    officialApplyLink: 'https://internship.meity.gov.in',
+    officialNotificationPDF: 'https://internship.meity.gov.in/Guidelines.pdf',
+    ministry: 'Ministry of Electronics & Information Technology',
+    launchYear: 2018,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 7,
+    requiredDocuments: ['Aadhaar Card', 'Education Certificate'],
+    recommendedDocuments: ['College ID / NOC'],
+    renewable: false,
+    tags: ['Internship', 'Technology', 'Youth', 'Stipend', 'Central'],
+    category: 'Youth',
+    subcategory: 'Internship',
+    name: 'Digital India Internship Scheme',
+    shortDescription: '2-month paid government IT internship with ₹10,000/month stipend.',
+    fullDescription: 'An opportunity for students pursuing IT/engineering degrees.',
+    targetAudience: 'College students pursuing IT/engineering degrees',
+    minAge: 18,
+    maxAge: 28,
+    studentEligible: true,
+    farmerEligible: false,
+    seniorCitizenEligible: false,
+    disabledEligible: true
+  },
+  {
+    schemeId: 'scheme-009',
+    title: 'National Scholarship Portal — Post Matric Scholarships Scheme',
+    subtitle: 'Post Matric Scholarship',
+    description: 'A scheme to provide financial assistance to students belonging to economically weaker sections to pursue post-matric or post-secondary courses.',
+    benefits: [
+      'Scholarship amount between ₹10,000 and ₹50,000 per annum depending on course',
+      'Direct Benefit Transfer to student bank accounts',
+      'Covers academic fees, books, study tours, and maintenance allowance'
+    ],
+    eligibility: 'Indian students pursuing higher education whose annual family income is below ₹2.5 lakh.',
+    documentsRequired: ['Aadhaar Card', 'Income Certificate', 'Education Certificate', 'Bank Passbook'],
+    incomeLimit: 'EWS',
+    gender: 'All',
+    ageRange: '16-30',
+    occupation: 'Student',
+    education: 'Secondary',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2015-07-01',
+    applicationEnd: '2026-10-31',
+    status: 'Active' as const,
+    officialWebsite: 'https://scholarships.gov.in',
+    officialApplyLink: 'https://scholarships.gov.in',
+    officialNotificationPDF: 'https://scholarships.gov.in/Guidelines.pdf',
+    ministry: 'Ministry of Social Justice & Empowerment',
+    launchYear: 2015,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 8,
+    requiredDocuments: ['Aadhaar Card', 'Income Certificate', 'Education Certificate'],
+    recommendedDocuments: ['Bank Passbook'],
+    renewable: true,
+    tags: ['Scholarship', 'Education', 'Student Support', 'Central'],
+    category: 'Student',
+    subcategory: 'Scholarship',
+    name: 'National Scholarship Portal — Post Matric Scholarships Scheme',
+    shortDescription: 'Financial scholarship of up to ₹50,000/year for higher education.',
+    fullDescription: 'A scheme to provide financial assistance to students belonging to EWS.',
+    targetAudience: 'Low-income students pursuing higher education',
+    minAge: 16,
+    maxAge: 30,
+    studentEligible: true,
+    farmerEligible: false,
+    seniorCitizenEligible: false,
+    disabledEligible: true
+  },
+  {
+    schemeId: 'scheme-010',
+    title: 'Startup India Scheme',
+    subtitle: 'Startup India Support',
+    description: 'A flagship initiative of the Government of India intended to build a strong ecosystem that is conducive for the growth of startup businesses.',
+    benefits: [
+      'Income tax exemptions for 3 consecutive years under Section 80-IAC',
+      'Up to 80% rebate on patent filing fees and fast-tracked patent inspection',
+      'Access to ₹10,000 Crore Fund of Funds and credit guarantee schemes'
+    ],
+    eligibility: 'DPIIT recognized entity incorporated as Private Limited, LLP or Partnership firm not older than 10 years.',
+    documentsRequired: ['Aadhaar Card', 'PAN Card', 'Incorporation Certificate'],
+    incomeLimit: 'All',
+    gender: 'All',
+    ageRange: '18-120',
+    occupation: 'Entrepreneur',
+    education: 'Any',
+    state: 'All',
+    applicationMode: 'Online' as const,
+    applicationStart: '2016-01-16',
+    applicationEnd: 'Permanent',
+    status: 'Active' as const,
+    officialWebsite: 'https://www.startupindia.gov.in',
+    officialApplyLink: 'https://www.startupindia.gov.in/content/sih/en/registration.html',
+    officialNotificationPDF: 'https://www.startupindia.gov.in/content/dam/g2b-content/Guidance.pdf',
+    ministry: 'Ministry of Commerce & Industry',
+    launchYear: 2016,
+    lastVerifiedDate: '2026-07-14',
+    priorityScore: 8,
+    requiredDocuments: ['Aadhaar Card', 'PAN Card', 'Incorporation Certificate'],
+    recommendedDocuments: [],
+    renewable: false,
+    tags: ['Startup', 'Business', 'Tax Holiday', 'Funding', 'Central'],
+    category: 'Startup',
+    subcategory: 'Business Support',
+    name: 'Startup India Initiative',
+    shortDescription: 'Tax holidays, funding support, and fast-track patents for startups.',
+    fullDescription: 'A flagship initiative of the Government of India to support startups.',
+    targetAudience: 'Entrepreneurs and early-stage startup founders',
+    minAge: 18,
+    maxAge: undefined,
+    studentEligible: true,
+    farmerEligible: true,
+    seniorCitizenEligible: true,
+    disabledEligible: true
+  }
 ];
+
+// Helper to locally map SchemeRecords without circular imports during parse
+function evaluateSchemeLocally(record: any): Scheme {
+  const resolvedRequiredDocs: RequiredDocument[] = record.requiredDocuments.map((docName: string, idx: number) => ({
+    id: `${record.schemeId}-doc-${idx}`,
+    name: docName,
+    iconName: docName.toLowerCase().includes('aadhaar') ? 'card-account-details' : 'file-document-outline',
+    status: 'missing' as const,
+    description: `Official ${docName} verification document`
+  }));
+
+  const criteria: EligibilityCriterion[] = [
+    { id: 'age', label: 'Age Eligibility', required: record.ageRange, userValue: '28 years', passed: true },
+    { id: 'gender', label: 'Gender Target', required: record.gender, userValue: 'Male', passed: true },
+    { id: 'income', label: 'Income Limit', required: record.incomeLimit, userValue: 'EWS', passed: true },
+    { id: 'state', label: 'State Residency', required: record.state, userValue: 'Maharashtra', passed: true },
+    { id: 'occupation', label: 'Occupation Match', required: record.occupation, userValue: 'Self-Employed', passed: true }
+  ];
+
+  return {
+    id: record.schemeId,
+    title: record.title,
+    shortTitle: record.subtitle,
+    department: record.ministry,
+    ministry: record.ministry,
+    category: record.category as any,
+    type: (record.state === 'All' ? 'Central' : 'State') as any,
+    state: record.state === 'All' ? undefined : record.state,
+    description: record.description,
+    benefits: record.benefits,
+    financialAssistance: record.benefits[0] || 'Guaranteed benefits',
+    applicationPeriod: `${record.applicationStart} to ${record.applicationEnd}`,
+    renewable: record.renewable,
+    deadline: record.applicationEnd === 'Permanent' ? 'Open Enrollment' : record.applicationEnd,
+    processingTime: '15-30 working days',
+    applicationFee: 0,
+    officialPortal: record.officialWebsite,
+    eligibilityPercentage: 100,
+    eligibilityStatus: 'eligible' as const,
+    eligibilityCriteria: criteria,
+    requiredDocuments: resolvedRequiredDocs,
+    recommendedDocuments: [],
+    faqs: [
+      { id: 'faq-1', question: `How to apply?`, answer: `Visit ${record.officialApplyLink}` }
+    ],
+
+    accentColor: '#2196F3',
+    iconName: 'shield-check-outline',
+    tags: record.tags,
+
+    // Database fields mapping
+    name: record.title,
+    shortDescription: record.subtitle,
+    fullDescription: record.description,
+    subcategory: record.subtitle,
+    targetAudience: 'Indian Citizens',
+    minAge: record.ageRange === 'All' ? 0 : parseInt(record.ageRange.split('-')[0], 10),
+    maxAge: record.ageRange === 'All' ? undefined : (record.ageRange.split('-')[1] ? parseInt(record.ageRange.split('-')[1], 10) : undefined),
+    gender: record.gender,
+    incomeLimit: record.incomeLimit,
+    occupation: record.occupation,
+    studentEligible: record.occupation === 'Student' || record.tags.includes('Student'),
+    farmerEligible: record.occupation === 'Farmer' || record.tags.includes('Farmers'),
+    seniorCitizenEligible: record.tags.includes('Senior Citizens') || record.ageRange.includes('70'),
+    disabledEligible: record.tags.includes('Disabled'),
+    documentsRequired: record.documentsRequired,
+    officialWebsite: record.officialWebsite,
+    officialApplyLink: record.officialApplyLink,
+    launchYear: record.launchYear,
+    applicationMode: record.applicationMode,
+    status: record.status,
+
+    version: record.version || 1,
+    lastUpdated: record.lastUpdated || record.lastVerifiedDate || '',
+    officialNotification: record.officialNotification || record.officialNotificationPDF || ''
+  };
+}
+
+export const SCHEMES: Scheme[] = BASE_SCHEMES_DATA.map(r => evaluateSchemeLocally(r));
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
@@ -970,8 +725,22 @@ export function getEligibleSchemes(): Scheme[] {
   );
 }
 
-export function getSchemeById(id: string): Scheme | undefined {
-  return SCHEMES.find((s) => s.id === id);
+export function getSchemeById(
+  id: string,
+  user: VaultGovUser | null = null,
+  userDocs: VaultGovDocument[] = []
+): Scheme | undefined {
+  const record = BASE_SCHEMES_DATA.find((s) => s.schemeId === id);
+  if (!record) return undefined;
+  
+  // Lazy evaluation using the SchemeRepository
+  try {
+    const { SchemeRepository } = require('@/services/schemes/SchemeRepository');
+    return SchemeRepository.evaluateScheme(record, user, userDocs);
+  } catch (err) {
+    // Failover to local map if import fails (e.g. during bundler start)
+    return evaluateSchemeLocally(record);
+  }
 }
 
 export function generateApplicationId(): string {

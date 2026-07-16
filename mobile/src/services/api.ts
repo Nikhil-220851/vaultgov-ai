@@ -126,7 +126,10 @@ function getHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
   };
   if (_authToken) {
+    console.log(`[API getHeaders] Attaching Authorization header (Token prefix: ${_authToken.substring(0, 15)}...)`);
     headers['Authorization'] = `Bearer ${_authToken}`;
+  } else {
+    console.log('[API getHeaders] Warning: No _authToken is set in apiClient. Authorization header is missing.');
   }
   return headers;
 }
@@ -241,12 +244,15 @@ async function fetchWithRetry(
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
+    let bodyText = '';
     try {
-      const body = await response.json();
+      bodyText = await response.text();
+      const body = JSON.parse(bodyText);
       detail = body.detail ?? body.message ?? detail;
     } catch {
-      // ignore parse errors — keep the status string as the message
+      detail = bodyText || detail;
     }
+    console.error(`[API Error Response] Request failed. URL: ${response.url}, Status: ${response.status}, Detail: ${detail}, Raw Body: ${bodyText || '(empty)'}`);
     throw new ApiError(response.status, detail);
   }
   return response.json() as Promise<T>;
@@ -447,5 +453,60 @@ export const apiClient = {
     });
 
     return handleResponse<{ secure_url: string; public_id: string; width?: number; height?: number }>(response);
+  },
+
+  /**
+   * GET /api/v1/schemes/sync
+   * Delta synchronise backend schemes using the 'since' server timestamp.
+   */
+  async syncSchemes(since: string | null): Promise<{
+    newSchemes: any[];
+    updatedSchemes: any[];
+    archivedSchemes: any[];
+    serverTime: string;
+    latestVersion: number;
+  }> {
+    const url = since
+      ? `${API_BASE_URL}/api/v1/schemes/sync?since=${encodeURIComponent(since)}`
+      : `${API_BASE_URL}/api/v1/schemes/sync`;
+    console.log(`[API syncSchemes] Request URL: ${url}`);
+    const response = await fetchWithRetry(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * GET /api/v1/schemes/search
+   * Search schemes on the backend.
+   */
+  async searchSchemes(params: Record<string, any>): Promise<any> {
+    const query = Object.entries(params)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join('&');
+    const url = `${API_BASE_URL}/api/v1/schemes/search?${query}`;
+    console.log(`[API searchSchemes] Request URL: ${url}`);
+    const response = await fetchWithRetry(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  /**
+   * GET /api/v1/schemes/:schemeId
+   * Fetch a single scheme by its schemeId string.
+   * Used by the Details screen to retrieve a specific scheme.
+   */
+  async getSchemeById(schemeId: string): Promise<any> {
+    const url = `${API_BASE_URL}/api/v1/schemes/${encodeURIComponent(schemeId)}`;
+    console.log(`[API getSchemeById] Request URL: ${url}`);
+    const response = await fetchWithRetry(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
   },
 };

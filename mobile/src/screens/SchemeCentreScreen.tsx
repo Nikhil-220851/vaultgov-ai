@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,18 +17,24 @@ import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  SCHEMES,
+  BASE_SCHEMES_DATA,
   Scheme,
   AppliedScheme,
   getApplicationStatusColor,
   getApplicationStatusLabel,
 } from '@/data/schemes';
+import { useUser } from '@/context/UserContext';
+import { useDocumentStore } from '@/features/documents/store/useDocumentStore';
+import { SchemeDatabase } from '@/services/schemes/SchemeDatabase';
+import { SchemeRepository } from '@/services/schemes/SchemeRepository';
+import { SchemeRecord } from '@/services/schemes/types';
 import { SchemeCard } from '@/components/schemes/SchemeCard';
 import { SearchBar } from '@/components/schemes/SearchBar';
 import { FilterBottomSheet, SchemeFilter, DEFAULT_FILTER } from '@/components/schemes/FilterBottomSheet';
 import { ApplicationProgress } from '@/components/schemes/ApplicationProgress';
 import { colors } from '@/theme/colors';
 import { Colors, Spacing, Typography } from '@/theme';
+import { schemeSyncService } from '@/services/schemes/SchemeSyncService';
 
 type Tab = 'eligible' | 'applied' | 'saved';
 
@@ -35,22 +43,35 @@ const STORAGE_KEYS = {
   applied: 'vaultgov_applied_schemes',
 };
 
-
-
 export function SchemeCentreScreen() {
   const router = useRouter();
+  const { user } = useUser();
+  const { documents } = useDocumentStore();
   const [activeTab, setActiveTab] = useState<Tab>('eligible');
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<SchemeFilter>(DEFAULT_FILTER);
   const [filterVisible, setFilterVisible] = useState(false);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [appliedSchemes, setAppliedSchemes] = useState<AppliedScheme[]>([]);
+  const [dbSchemes, setDbSchemes] = useState<SchemeRecord[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // ── Track mount status ────────────────────────────────────────────────────
+  const isMountedRef = React.useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadSavedIds = async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEYS.saved);
-        if (stored) setSavedIds(JSON.parse(stored));
+        if (isMounted && stored) setSavedIds(JSON.parse(stored));
       } catch {
         // silent fail
       }
@@ -59,7 +80,7 @@ export function SchemeCentreScreen() {
     const loadAppliedSchemes = async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEYS.applied);
-        if (stored) {
+        if (isMounted && stored) {
           const parsed = JSON.parse(stored) as AppliedScheme[];
           setAppliedSchemes(parsed);
         }
@@ -68,9 +89,59 @@ export function SchemeCentreScreen() {
       }
     };
 
+    const loadDbSchemes = async () => {
+      try {
+        await SchemeDatabase.initDatabase();
+        const active = await SchemeDatabase.getActiveSchemes();
+        if (isMounted) setDbSchemes(active);
+      } catch {
+        // silent fail
+      }
+    };
+
     loadSavedIds();
     loadAppliedSchemes();
+    loadDbSchemes();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const reloadDbSchemes = useCallback(async () => {
+    try {
+      await SchemeDatabase.initDatabase();
+      const active = await SchemeDatabase.getActiveSchemes();
+      if (isMountedRef.current) {
+        setDbSchemes(active);
+      }
+    } catch {
+      // silent fail
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const result = await schemeSyncService.sync('manual');
+      if (isMountedRef.current) {
+        await reloadDbSchemes();
+        Alert.alert(
+          result.success ? 'Schemes Updated' : 'Sync Failed',
+          result.message,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch {
+      if (isMountedRef.current) {
+        Alert.alert('Sync Failed', 'Could not refresh schemes. Please try again.', [{ text: 'OK' }]);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsRefreshing(false);
+      }
+    }
+  }, [reloadDbSchemes]);
 
   const toggleSave = useCallback(async (schemeId: string) => {
     setSavedIds((prev) => {
@@ -89,9 +160,16 @@ export function SchemeCentreScreen() {
 
   // ─── Filtered Schemes ───────────────────────────────────────────────────────
 
-  const eligibleSchemes = SCHEMES.filter(
-    (s) => s.eligibilityStatus === 'eligible' || s.eligibilityStatus === 'partially_eligible'
-  );
+  const evaluatedSchemes = React.useMemo(() => {
+    const sourceList = dbSchemes.length > 0 ? dbSchemes : BASE_SCHEMES_DATA;
+    return sourceList.map((record) => SchemeRepository.evaluateScheme(record as any, user, documents));
+  }, [dbSchemes, user, documents]);
+
+  const eligibleSchemes = React.useMemo(() => {
+    return evaluatedSchemes.filter(
+      (s) => s.eligibilityStatus === 'eligible' || s.eligibilityStatus === 'partially_eligible'
+    );
+  }, [evaluatedSchemes]);
 
   const applyFilters = (schemes: Scheme[]): Scheme[] => {
     let result = [...schemes];
@@ -125,7 +203,10 @@ export function SchemeCentreScreen() {
 
   const filteredEligible = applyFilters(eligibleSchemes);
 
-  const savedSchemes = SCHEMES.filter((s) => savedIds.includes(s.id));
+  const savedSchemes = React.useMemo(() => {
+    return evaluatedSchemes.filter((s) => savedIds.includes(s.id));
+  }, [evaluatedSchemes, savedIds]);
+  
   const filteredSaved = applyFilters(savedSchemes);
 
   // ─── Active Filter Count ────────────────────────────────────────────────────
@@ -147,7 +228,7 @@ export function SchemeCentreScreen() {
   );
 
   const renderAppliedItem = ({ item }: { item: AppliedScheme }) => {
-    const scheme = SCHEMES.find((s) => s.id === item.schemeId);
+    const scheme = evaluatedSchemes.find((s) => s.id === item.schemeId);
     if (!scheme) return null;
     const statusColor = getApplicationStatusColor(item.status);
 
@@ -289,6 +370,14 @@ export function SchemeCentreScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={() => renderEmptyState('eligible')}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
 
@@ -300,6 +389,14 @@ export function SchemeCentreScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={() => renderEmptyState('applied')}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
 
@@ -311,6 +408,14 @@ export function SchemeCentreScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={() => renderEmptyState('saved')}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         />
       )}
 

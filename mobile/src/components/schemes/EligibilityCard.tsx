@@ -11,23 +11,30 @@ interface EligibilityCardProps {
   eligibilityPercentage: number;
 }
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<EligibilityStatus, { label: string; sublabel: string; color: string; bgColor: string; iconName: 'checkmark-circle' | 'alert-circle' | 'close-circle' }> = {
+  highly_recommended: {
+    label: 'Likely Eligible',
+    sublabel: 'You are an excellent match for this scheme.',
+    color: '#1B8A3E',
+    bgColor: '#E6F5EC',
+    iconName: 'checkmark-circle' as const,
+  },
   eligible: {
-    label: 'You are Eligible',
-    sublabel: 'You meet all eligibility criteria for this scheme.',
+    label: 'Potential Match',
+    sublabel: 'You meet the eligibility criteria for this scheme.',
     color: '#3CC556',
     bgColor: '#EDFBF0',
     iconName: 'checkmark-circle' as const,
   },
   partially_eligible: {
-    label: 'Partially Eligible',
+    label: 'Partial Match',
     sublabel: 'You meet some criteria. Review the details below.',
     color: '#FF9800',
     bgColor: '#FFF7EC',
     iconName: 'alert-circle' as const,
   },
   not_eligible: {
-    label: 'Not Eligible',
+    label: 'Unlikely Match',
     sublabel: 'You do not currently meet the eligibility criteria.',
     color: '#FF3B30',
     bgColor: '#FFF1F0',
@@ -130,9 +137,9 @@ export function EligibilityCard({
 
       {/* Note */}
       <View style={styles.noteBox}>
-        <MaterialCommunityIcons name="shield-check-outline" size={14} color={Colors.darkGray} />
+        <MaterialCommunityIcons name="alert-circle-outline" size={14} color="#FF9800" style={{ marginTop: 2 }} />
         <Text style={styles.noteText}>
-          Eligibility is based on your VaultGov profile. Final verification is done by the government department.
+          Final eligibility is determined by the official Government authority. Please verify the complete eligibility criteria on the official website before applying.
         </Text>
       </View>
     </View>
