@@ -17,13 +17,65 @@ import { File } from 'expo-file-system';
 // ─── Error Types ──────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
+  public readonly status: number;
+  public readonly statusText?: string;
+  public readonly responseBody?: string;
+  public readonly url?: string;
+  public readonly method?: string;
+
   constructor(
     public readonly status: number,
-    message: string,
-    public readonly detail?: any
+    message: string | object,
+    public readonly detail?: any,
+    options?: {
+      statusText?: string;
+      responseBody?: string;
+      url?: string;
+      method?: string;
+    }
   ) {
-    super(message);
+    let finalMessage = '';
+    if (typeof message === 'object' && message !== null) {
+      try {
+        finalMessage = JSON.stringify(message);
+      } catch {
+        finalMessage = String(message);
+      }
+    } else {
+      finalMessage = String(message);
+    }
+    super(finalMessage);
+    this.status = status;
+    this.statusText = options?.statusText;
+    this.responseBody = options?.responseBody;
+    this.url = options?.url;
+    this.method = options?.method;
     this.name = 'ApiError';
+
+    // Set prototype chain explicitly for TypeScript/ES5 transpilation
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+
+  toString(): string {
+    const methodPart = this.method ? `${this.method} ` : '';
+    const urlPart = this.url ? this.url : '';
+    const statusPart = `Status: ${this.status}${this.statusText ? ' ' + this.statusText : ''}`;
+    
+    let responsePart = '';
+    if (this.responseBody) {
+      try {
+        const parsed = JSON.parse(this.responseBody);
+        responsePart = `Response:\n${JSON.stringify(parsed, null, 4)}`;
+      } catch {
+        responsePart = `Response:\n${this.responseBody}`;
+      }
+    } else {
+      responsePart = `Response:\n{"message": "${this.message}"}`;
+    }
+
+    const stackPart = this.stack ? `\n\nStack Trace:\n${this.stack}` : '';
+
+    return `${methodPart}${urlPart}\n\n${statusPart}\n\n${responsePart}${stackPart}`;
   }
 }
 
@@ -552,5 +604,38 @@ export const apiClient = {
   async getRecommendationsSummary(): Promise<RecommendationsSummary> {
     const url = `${API_BASE_URL}/api/v1/schemes/recommendations/summary`;
     return fetchWithRetry<RecommendationsSummary>(url, { method: 'GET', headers: getHeaders() });
+  },
+
+  /**
+   * POST /api/copilot/chat
+   * Chat with the VaultGov Copilot.
+   */
+  async chatWithCopilot(message: string): Promise<{
+    message: string;
+    intent: string;
+    confidence: number;
+    actions: { type: string; label: string; data?: any }[];
+    sources: { type: string; id: string; title: string; url?: string }[];
+    metadata: Record<string, any>;
+  }> {
+    const url = `${API_BASE_URL}/api/copilot/chat`;
+    const headers = getHeaders();
+    const reqBody = JSON.stringify({ message });
+    console.log(`[API chatWithCopilot] Request URL: ${url}`);
+    console.log('[API chatWithCopilot] Request Headers:', JSON.stringify(headers, null, 2));
+    console.log('[API chatWithCopilot] Request Body:', reqBody);
+    const response = await fetchWithRetry<{
+      message: string;
+      intent: string;
+      confidence: number;
+      actions: { type: string; label: string; data?: any }[];
+      sources: { type: string; id: string; title: string; url?: string }[];
+      metadata: Record<string, any>;
+    }>(url, {
+      method: 'POST',
+      headers: headers,
+      body: reqBody,
+    });
+    return response;
   },
 };

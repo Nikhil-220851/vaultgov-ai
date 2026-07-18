@@ -22,6 +22,7 @@ import { QuickChip } from '@/components/chat/QuickChip';
 import { AIResponseCard, AICardData } from '@/components/chat/AIResponseCard';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { Colors, Spacing, Typography } from '@/theme';
+import { apiClient } from '@/services/api';
 
 interface Message {
   id: string;
@@ -61,100 +62,173 @@ export function GovAssistChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef<FlatList>(null);
-  const [messageCounter, setMessageCounter] = useState(0);
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = async (textToSend?: string) => {
+    if (isTyping) return; // Prevent concurrent requests
     const text = (textToSend || inputText).trim();
     if (!text) return;
 
-    const userMsgId = `msg-${messageCounter + 1}`;
-
+    const userMsgId = `user-${Date.now()}-${Math.random()}`;
     const userMsg: Message = {
       id: userMsgId,
       sender: 'user',
       text,
       timestamp: getFormattedTime(),
     };
+    console.log(`[GovAssistChatScreen] Created USER Message: ID=${userMsgId}, text="${text}"`);
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
     setIsTyping(true);
 
-    // Simulate AI response after 1.5s
-    setTimeout(() => {
-      let aiText = '';
+    try {
+      const response = await apiClient.chatWithCopilot(text);
       let cardData: AICardData | undefined;
 
-      const lowerText = text.toLowerCase();
-
-      if (lowerText.includes('schemes') || lowerText.includes('eligible')) {
-        aiText = 'Based on your profile, I found multiple government benefits you are eligible to receive. Here is the top matching program:';
-        cardData = {
-          type: 'scheme',
-          title: 'PM Awas Yojana (PMAY)',
-          subtitle: 'Ministry of Housing and Urban Affairs',
-          badge: 'Eligible',
-          badgeColor: Colors.primaryGreen,
-          details: [
-            { label: 'Financial Assistance', value: 'Subsidy up to ₹2.67 Lakh' },
-            { label: 'Application Deadline', value: '31 Dec 2026' },
-            { label: 'Expected Process Time', value: '30–45 Days' },
-          ],
-          primaryActionLabel: 'Apply Now',
-          secondaryActionLabel: 'View Details',
-          iconName: 'home-outline',
-        };
-      } else if (lowerText.includes('expiry') || lowerText.includes('expire') || lowerText.includes('document')) {
-        aiText = 'I scanned your VaultGov locker. Most of your credentials are valid, but we identified one document requiring immediate renewal:';
-        cardData = {
-          type: 'document',
-          title: 'Driving Licence (DL)',
-          subtitle: 'Ministry of Road Transport & Highways',
-          badge: 'Expiring Soon',
-          badgeColor: Colors.primaryOrange,
-          details: [
-            { label: 'Expiry Date', value: '24 July 2026' },
-            { label: 'Validity Remaining', value: '20 days' },
-            { label: 'Status', value: 'Needs renewal action' },
-          ],
-          primaryActionLabel: 'Renew Now',
-          secondaryActionLabel: 'Locker Details',
-          iconName: 'car-outline',
-        };
-      } else if (lowerText.includes('health') || lowerText.includes('score')) {
-        aiText = 'Your Document Health Score is currently at 78/100. Let\'s get it to 100/100 by completing these recommended items:';
+      // 1. Check for document status card
+      if (response.intent === 'document_status' && response.metadata.documents && response.metadata.documents.has_documents) {
+        const doc = response.metadata.documents.documents[0];
+        if (doc) {
+          const isSuccess = doc.visual_state === 'success';
+          const isWarning = doc.visual_state === 'warning';
+          const isDanger = doc.visual_state === 'danger';
+          const badge = isSuccess ? 'Verified' : isWarning ? 'Needs Attention' : isDanger ? 'Action Required' : 'Uploaded';
+          const badgeColor = isSuccess ? Colors.primaryGreen : isWarning ? Colors.primaryOrange : isDanger ? Colors.dangerRed : Colors.darkGray;
+          
+          cardData = {
+            type: 'document',
+            title: doc.title,
+            subtitle: doc.category || 'Government Document',
+            badge: badge,
+            badgeColor: badgeColor,
+            details: [
+              { label: 'Category', value: doc.category || 'Uncategorised' },
+              { label: 'Expiry Info', value: doc.expiry_text || 'Permanent' },
+            ],
+            primaryActionLabel: (isWarning || isDanger) ? 'Renew Now' : 'Locker Details',
+            iconName: doc.icon_name || 'document-text-outline',
+          };
+        }
+      } 
+      // 2. Check for document reminder card
+      else if (response.intent === 'document_reminder' && response.metadata.expiring_documents && response.metadata.expiring_documents.has_expiring) {
+        const doc = response.metadata.expiring_documents.documents[0];
+        if (doc) {
+          cardData = {
+            type: 'document',
+            title: doc.title,
+            subtitle: doc.category || 'Government Document',
+            badge: 'Expiring Soon',
+            badgeColor: Colors.primaryOrange,
+            details: [
+              { label: 'Expiry Info', value: doc.expiry_text || 'Expiring' },
+              { label: 'Status', value: 'Needs renewal action' },
+            ],
+            primaryActionLabel: 'Renew Now',
+            secondaryActionLabel: 'Locker Details',
+            iconName: doc.icon_name || 'car-outline',
+          };
+        }
+      } 
+      // 3. Check for active schemes card
+      else if ((response.intent === 'active_schemes' || response.intent === 'eligibility') && response.metadata.schemes && response.metadata.schemes.has_schemes) {
+        const scheme = response.metadata.schemes.schemes[0];
+        if (scheme) {
+          cardData = {
+            type: 'scheme',
+            title: scheme.title,
+            subtitle: scheme.ministry || 'Ministry',
+            badge: scheme.status || 'Active',
+            badgeColor: Colors.primaryGreen,
+            details: [
+              { label: 'Category', value: scheme.category || 'General' },
+              { label: 'Application Deadline', value: scheme.applicationEnd || 'Permanent' },
+            ],
+            primaryActionLabel: 'Apply Now',
+            secondaryActionLabel: 'View Details',
+            iconName: 'home-outline',
+          };
+        }
+      } 
+      // 4. Check for profile summary card
+      else if (response.intent === 'profile_summary' && response.metadata.profile) {
+        const profile = response.metadata.profile;
+        if (profile.profile_completed) {
+          cardData = {
+            type: 'health',
+            title: 'Profile Status',
+            subtitle: 'Profile Audit',
+            badge: 'Complete',
+            badgeColor: Colors.primaryGreen,
+            details: [
+              { label: 'Status', value: '100% Completed' },
+            ],
+            primaryActionLabel: 'Explore Schemes',
+            iconName: 'shield-checkmark-outline',
+          };
+        } else if (profile.missing_fields && profile.missing_fields.length > 0) {
+          cardData = {
+            type: 'health',
+            title: 'Profile Incomplete',
+            subtitle: 'Profile Audit',
+            badge: 'Action Required',
+            badgeColor: Colors.primaryOrange,
+            details: [
+              { label: 'Missing Fields', value: profile.missing_fields.join(', ') },
+            ],
+            primaryActionLabel: 'Complete Profile',
+            iconName: 'shield-checkmark-outline',
+          };
+        }
+      } 
+      // 5. Check for application statistics card
+      else if (response.intent === 'application_statistics' && response.metadata.statistics) {
+        const stats = response.metadata.statistics;
         cardData = {
           type: 'health',
-          title: 'Document Health Score',
-          subtitle: 'Locker Health Audit',
-          badge: '78 / 100',
+          title: 'Document Upload Stats',
+          subtitle: 'Locker Audit',
+          badge: `${stats.total_documents} Docs`,
           badgeColor: Colors.primaryGreen,
           details: [
-            { label: 'Verified Records', value: '9 Documents Linked' },
-            { label: 'Action Required', value: 'Renew Driving Licence' },
-            { label: 'Missing Documents', value: 'Ration Card (EWS Verification)' },
+            { label: 'Total Categories', value: `${stats.total_categories}` },
+            { label: 'Storage Used', value: `${(stats.storage_used_bytes / (1024 * 1024)).toFixed(1)} MB` },
           ],
-          primaryActionLabel: 'Fix Issues Now',
+          primaryActionLabel: 'Manage Documents',
           iconName: 'shield-checkmark-outline',
         };
-      } else {
-        aiText = `Thank you for your query about "${text}". I am here to help you navigate government schemes, verify document renewals, or check application statuses. What would you like to explore next?`;
       }
 
-      const aiMsgId = `msg-${messageCounter + 2}`;
-
+      const aiMsgId = `ai-${Date.now()}-${Math.random()}`;
       const aiMsg: Message = {
         id: aiMsgId,
         sender: 'ai',
-        text: aiText,
+        text: response.message,
         timestamp: getFormattedTime(),
         cardData,
       };
+      console.log(`[GovAssistChatScreen] Created AI Message: ID=${aiMsgId}, text="${response.message}"`);
+
+      console.log("===== COPILOT RESPONSE =====");
+      console.log(JSON.stringify(response, null, 2));
+      console.log("============================");
+      console.log("Card Data:", cardData);
 
       setMessages((prev) => [...prev, aiMsg]);
-      setMessageCounter((prevVal) => prevVal + 2);
+    } catch (err) {
+      console.error('[GovAssistChatScreen] Failed to get response from copilot:', err);
+      const errorMsgId = `error-${Date.now()}-${Math.random()}`;
+      const errorMsg: Message = {
+        id: errorMsgId,
+        sender: 'ai',
+        text: 'Sorry, I am unable to connect to the assistant right now. Please check your network connection and try again.',
+        timestamp: getFormattedTime(),
+      };
+      console.log(`[GovAssistChatScreen] Created ERROR Message: ID=${errorMsgId}`);
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   useEffect(() => {
@@ -254,8 +328,8 @@ export function GovAssistChatScreen() {
           {/* Quick chips bar */}
           <View style={styles.chipsBar}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-              {QUICK_CHIPS.map((chip, index) => (
-                <QuickChip key={index} label={chip} onPress={() => handleSend(chip)} />
+              {QUICK_CHIPS.map((chip) => (
+                <QuickChip key={`chip-${chip}`} label={chip} onPress={() => handleSend(chip)} />
               ))}
             </ScrollView>
           </View>

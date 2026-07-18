@@ -98,13 +98,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
    *   • Fresh login (OTP/Google) → usePostAuthRedirect upserts + routes
    */
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
 
       if (!fbUser) {
         // User signed out — clear auth token and any cached DB record
         apiClient.clearAuthToken();
         setUser(null);
+      } else {
+        // Firebase session is active — inject a fresh ID token into the API client
+        // so that every request (including Copilot) carries a valid Authorization header.
+        // AuthGate / usePostAuthRedirect still own the Neon DB lookup and navigation.
+        try {
+          const idToken = await fbUser.getIdToken();
+          apiClient.setAuthToken(idToken);
+          console.log('[UserContext] onAuthStateChanged: API token refreshed.');
+        } catch (err) {
+          console.warn('[UserContext] onAuthStateChanged: failed to get ID token:', err);
+        }
       }
       // Do NOT fetch from Neon here. AuthGate/usePostAuthRedirect handle that.
 
