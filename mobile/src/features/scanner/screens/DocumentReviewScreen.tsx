@@ -1,16 +1,17 @@
 /**
  * DocumentReviewScreen.tsx
  *
- * Document Review screen — the final step before saving.
- * The user can:
- *  - Review and edit the document title
- *  - Select a category (Govt IDs, Certificates, Education, Other)
- *  - Add optional comma-separated tags
- *  - See a summary of the extracted text and metadata
- *  - Tap Save to persist the document to the vault
+ * The SINGLE Unified Review Screen for all document sources (Camera, Gallery, PDF).
+ *
+ * Responsibilities:
+ *  - Receive a prefilled ReviewModel
+ *  - Display document metadata & preview
+ *  - Render structured fields dynamically (Object.entries)
+ *  - Allow editing of Title, Category, and Dynamic Structured Fields
+ *  - Direct DB Save via POST /documents (<1s target, NO Gemini call)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,47 +23,29 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as crypto from 'expo-crypto';
 import { Colors, Spacing, Typography, Radius } from '@/theme';
-import { DocumentReviewData, DocumentReviewCategory, OCRConfidenceLevel } from '../types/ocr.types';
+import { ReviewModel, DocumentCategory } from '../types/review.types';
 import { useDocumentStore } from '@/features/documents/store/useDocumentStore';
 import { apiClient } from '@/services/api';
-import { storageService } from '@/services/storageService';
 import { auth } from '@/services/firebase';
 
-// ─── Categories ───────────────────────────────────────────────────────────────
-
-const CATEGORIES: { label: DocumentReviewCategory; icon: string }[] = [
-  { label: 'Govt IDs',      icon: 'card-outline' },
-  { label: 'Certificates',  icon: 'document-text-outline' },
-  { label: 'Education',     icon: 'school-outline' },
-  { label: 'Other',         icon: 'folder-outline' },
+const CATEGORIES: { label: DocumentCategory; icon: string }[] = [
+  { label: 'Govt IDs', icon: 'card-outline' },
+  { label: 'Certificates', icon: 'document-text-outline' },
+  { label: 'Education', icon: 'school-outline' },
+  { label: 'Other', icon: 'folder-outline' },
 ];
 
-// ─── Confidence coloring ───────────────────────────────────────────────────────
-
-const CONFIDENCE_COLORS: Record<OCRConfidenceLevel, string> = {
-  Excellent: '#1A9130',
-  Good:      '#1565C0',
-  Fair:      '#B36800',
-  Poor:      '#C62828',
-  Unknown:   '#707070',
-};
-
-
-
-
-// ─── Props ────────────────────────────────────────────────────────────────────
-
 interface DocumentReviewScreenProps {
-  reviewData: DocumentReviewData;
+  reviewModel: ReviewModel;
   onBack: () => void;
 }
-
-// ─── Section Header ───────────────────────────────────────────────────────────
 
 const SectionHeader: React.FC<{ title: string; icon: string }> = ({ title, icon }) => (
   <View style={styles.sectionHeader}>
@@ -71,29 +54,34 @@ const SectionHeader: React.FC<{ title: string; icon: string }> = ({ title, icon 
   </View>
 );
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
-  reviewData,
+  reviewModel,
   onBack,
 }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { fetchDocuments } = useDocumentStore();
 
-  const [title, setTitle] = useState(reviewData.metadata.detectedTitle || reviewData.title || 'Scanned Document');
-  const [category, setCategory] = useState<DocumentReviewCategory>(reviewData.category);
-  const [tagsInput, setTagsInput] = useState(reviewData.tags.join(', '));
+  const [title, setTitle] = useState(reviewModel.documentTitle || 'Scanned Document');
+  const [category, setCategory] = useState<DocumentCategory>(reviewModel.category);
+  const [tagsInput, setTagsInput] = useState(reviewModel.documentType || '');
+  const [fields, setFields] = useState<Record<string, string | null>>(
+    reviewModel.structuredFields || {}
+  );
+
   const [isSaving, setIsSaving] = useState(false);
-
   const [saveStatus, setSaveStatus] = useState('');
-  const isSavingRef = React.useRef(false);
-
+  const isSavingRef = useRef(false);
   const [saveButtonScale] = useState(() => new Animated.Value(1));
 
-  // ── Category selector ────────────────────────────────────────────────────────
+  const handleFieldChange = (key: string, val: string) => {
+    setFields((prev) => ({
+      ...prev,
+      [key]: val,
+    }));
+  };
 
-  const CategoryChip: React.FC<{ item: typeof CATEGORIES[number] }> = ({ item }) => {
+  const CategoryChip: React.FC<{ item: (typeof CATEGORIES)[number] }> = ({ item }) => {
     const isSelected = category === item.label;
     return (
       <Pressable
@@ -123,13 +111,15 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
     );
   };
 
-  // ── Save handler ─────────────────────────────────────────────────────────────
-
+  // ── SAVE FLOW: DB Save ONLY (<1 second) ──────────────────────────────
   const handleSave = useCallback(async () => {
     if (isSavingRef.current) {
-      console.log('[DocumentReview] Save already in progress. Ignoring duplicate tap.');
+      console.log('[DocumentReviewScreen] Save already in progress. Ignoring duplicate tap.');
       return;
     }
+
+    const requestId = crypto.randomUUID();
+    console.log(`[SAVE FLOW] [${requestId}] Save pressed`);
 
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
@@ -139,17 +129,18 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
 
     isSavingRef.current = true;
     setIsSaving(true);
-    setSaveStatus('Uploading image...');
+    setSaveStatus('Saving to Vault...');
 
     Animated.sequence([
       Animated.timing(saveButtonScale, { toValue: 0.97, duration: 80, useNativeDriver: true }),
       Animated.timing(saveButtonScale, { toValue: 1, duration: 80, useNativeDriver: true }),
     ]).start();
 
+    let success = false;
     try {
       const tags = tagsInput
         .split(',')
-        .map(t => t.trim())
+        .map((t) => t.trim())
         .filter(Boolean);
 
       const userId = auth.currentUser?.uid;
@@ -157,43 +148,62 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         throw new Error('User not authenticated.');
       }
 
-      // Upload image to Cloudinary
-      console.log('[DocumentReview] Uploading image to Cloudinary...');
-      const downloadUrl = await storageService.uploadDocumentImage(reviewData.imageUri);
+      // If we don't have a Cloudinary URL yet (e.g. PDF local file or fallback), upload now
+      let finalImageUrl = reviewModel.cloudinaryUrl || null;
+      if (!finalImageUrl && reviewModel.source !== 'pdf') {
+        setSaveStatus('Uploading image...');
+        const res = await apiClient.uploadImageToBackend(reviewModel.imageUri, requestId);
+        finalImageUrl = res.secure_url;
+      }
 
       setSaveStatus('Saving document...');
+
+      // Build structured text combining dynamic fields
+      const structuredTextSummary = Object.entries(fields)
+        .map(([k, v]) => `${k}: ${v || 'N/A'}`)
+        .join('\n');
+
+      const fullExtractedText = [
+        reviewModel.extractedText,
+        '--- STRUCTURED FIELDS ---',
+        structuredTextSummary,
+      ].join('\n\n');
+
+      // Call database POST /documents directly (<1s target, NO Gemini call)
       await apiClient.createDocument({
         title: trimmedTitle,
         category,
-        image_uri: downloadUrl,
-        source: reviewData.metadata.source === 'camera' ? 'camera' : 'upload',
-        extracted_text: reviewData.extractedText,
+        image_uri: finalImageUrl || reviewModel.imageUri,
+        source: reviewModel.source === 'camera' ? 'camera' : 'upload',
+        extracted_text: fullExtractedText,
         tags,
-        confidence_score: reviewData.confidence.score ?? 0,
+        confidence_score: reviewModel.confidence || 0.9,
       });
 
       setSaveStatus('Done.');
       await fetchDocuments();
-      console.log('[OCR] Document saved:', trimmedTitle);
+      console.log(`[SAVE FLOW] [${requestId}] Document saved successfully`);
 
+      success = true;
       router.replace('/(tabs)/docs' as any);
     } catch (err: any) {
-      console.error('[DocumentReview] Save error:', err);
-      if (err.message && err.message.includes('Network request failed')) {
-        Alert.alert('Upload failed', 'No internet connection. Please check your network and try again.');
-      } else if (err.message && err.message.includes('upload')) {
-        Alert.alert('Upload failed', 'Image upload failed. Please try again.');
-      } else {
-        Alert.alert('Save failed', 'Document upload failed. Please try again.');
-      }
+      console.error('[DocumentReviewScreen] Save error:', err);
+      Alert.alert('Save failed', err?.message || 'Document save failed. Please try again.');
     } finally {
-      setIsSaving(false);
-      isSavingRef.current = false;
-      setSaveStatus('');
+      if (!success) {
+        setIsSaving(false);
+        isSavingRef.current = false;
+        setSaveStatus('');
+      }
     }
-  }, [title, category, tagsInput, reviewData, fetchDocuments, router, saveButtonScale]);
+  }, [title, category, tagsInput, fields, reviewModel, fetchDocuments, router, saveButtonScale]);
 
-  const displayConfidenceColor = CONFIDENCE_COLORS[reviewData.confidence.level];
+  const isPdf = reviewModel.source === 'pdf';
+  const entries = Object.entries(fields);
+
+  const confidencePct = Math.round((reviewModel.confidence || 0) * 100);
+  const confidenceColor =
+    confidencePct >= 80 ? '#16A34A' : confidencePct >= 50 ? '#CA8A04' : '#DC2626';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -204,7 +214,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         <Pressable
           style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.6 }]}
           onPress={onBack}
-          accessibilityLabel="Go back to extracted text"
+          accessibilityLabel="Go back"
           accessibilityRole="button"
         >
           <Ionicons name="arrow-back" size={22} color={Colors.pureBlack} />
@@ -219,86 +229,97 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* OCR Summary card */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryCardRow}>
-            <Ionicons name="document-text-outline" size={20} color={Colors.primaryBlue} />
-            <Text style={styles.summaryCardTitle}>OCR Summary</Text>
-          </View>
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryGridItem}>
-              <Text style={styles.summaryGridLabel}>Words</Text>
-              <Text style={styles.summaryGridValue}>{reviewData.metadata.wordCount}</Text>
-            </View>
-            <View style={styles.summaryGridItem}>
-              <Text style={styles.summaryGridLabel}>Characters</Text>
-              <Text style={styles.summaryGridValue}>{reviewData.metadata.characterCount}</Text>
-            </View>
-            <View style={styles.summaryGridItem}>
-              <Text style={styles.summaryGridLabel}>Source</Text>
-              <Text style={styles.summaryGridValue}>
-                {reviewData.metadata.source === 'camera' ? 'Camera' : 'Gallery'}
+        {/* Document Asset Preview */}
+        <View style={styles.previewCard}>
+          {isPdf ? (
+            <View style={styles.pdfPreview}>
+              <Ionicons name="document-text-outline" size={40} color={Colors.primaryBlue} />
+              <Text style={styles.pdfTitle} numberOfLines={1}>
+                {title}.pdf
               </Text>
+              <Text style={styles.pdfSubtitle}>PDF Document</Text>
             </View>
-            <View style={styles.summaryGridItem}>
-              <Text style={styles.summaryGridLabel}>Confidence</Text>
-              <Text style={[styles.summaryGridValue, { color: displayConfidenceColor }]}>
-                {reviewData.confidence.level}
-              </Text>
-            </View>
-          </View>
+          ) : (
+            <Image
+              source={{ uri: reviewModel.imageUri }}
+              style={styles.imagePreview}
+              resizeMode="contain"
+            />
+          )}
         </View>
 
-        {/* Document Title */}
+        {/* AI Intelligence Summary Badge */}
+        <View style={styles.badgeRow}>
+          <View style={styles.badge}>
+            <Ionicons name="sparkles-outline" size={13} color={Colors.primaryBlue} />
+            <Text style={styles.badgeText}>{reviewModel.documentType || 'unknown'}</Text>
+          </View>
+          <View style={[styles.badge, { borderColor: confidenceColor }]}>
+            <Ionicons name="checkmark-circle-outline" size={13} color={confidenceColor} />
+            <Text style={[styles.badgeText, { color: confidenceColor }]}>
+              {confidencePct}% confidence
+            </Text>
+          </View>
+          {reviewModel.processingTime ? (
+            <View style={styles.badge}>
+              <Ionicons name="time-outline" size={13} color={Colors.darkGray} />
+              <Text style={styles.badgeText}>{reviewModel.processingTime.toFixed(1)}s</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Title Input */}
         <View style={styles.section}>
           <SectionHeader title="Document Title" icon="text-outline" />
           <TextInput
             style={styles.titleInput}
             value={title}
             onChangeText={setTitle}
-            placeholder="e.g. Driving Licence, PAN Card…"
+            placeholder="Document Title"
             placeholderTextColor="#AAAAAA"
             maxLength={120}
             selectionColor={Colors.primaryBlue}
             returnKeyType="done"
-            accessibilityLabel="Document title"
             editable={!isSaving}
           />
         </View>
 
-        {/* Category */}
+        {/* Category Picker */}
         <View style={styles.section}>
           <SectionHeader title="Category" icon="layers-outline" />
           <View style={styles.categoryGrid}>
-            {CATEGORIES.map(item => (
+            {CATEGORIES.map((item) => (
               <CategoryChip key={item.label} item={item} />
             ))}
           </View>
         </View>
 
-        {/* Tags */}
-        <View style={styles.section}>
-          <SectionHeader title="Tags (optional)" icon="pricetag-outline" />
-          <TextInput
-            style={[styles.tagsInput, isSaving && { opacity: 0.5 }]}
-            value={tagsInput}
-            onChangeText={setTagsInput}
-            placeholder="aadhaar, 2024, identity…"
-            placeholderTextColor="#AAAAAA"
-            selectionColor={Colors.primaryBlue}
-            returnKeyType="done"
-            accessibilityLabel="Document tags"
-            editable={!isSaving}
-          />
-          <Text style={styles.tagsHint}>Separate tags with commas</Text>
-        </View>
+        {/* DYNAMIC FIELDS: Rendered automatically via Object.entries */}
+        {entries.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="Extracted Information" icon="sparkles-outline" />
+            {entries.map(([key, val]) => (
+              <View key={key} style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>{key}</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={val || ''}
+                  onChangeText={(newVal) => handleFieldChange(key, newVal)}
+                  placeholder={`Enter ${key}`}
+                  placeholderTextColor="#AAAAAA"
+                  editable={!isSaving}
+                />
+              </View>
+            ))}
+          </View>
+        )}
 
-        {/* Extracted text preview */}
+        {/* Extracted Raw OCR Text Preview */}
         <View style={styles.section}>
-          <SectionHeader title="Extracted Text Preview" icon="eye-outline" />
+          <SectionHeader title="Raw Extracted Text" icon="eye-outline" />
           <View style={styles.textPreviewCard}>
             <Text style={styles.textPreview} numberOfLines={8}>
-              {reviewData.editedLines.join('\n') || 'No text extracted.'}
+              {reviewModel.extractedText || 'No raw text extracted.'}
             </Text>
           </View>
         </View>
@@ -317,7 +338,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
             {isSaving ? (
               <>
                 <ActivityIndicator size="small" color={Colors.white} />
-                <Text style={styles.saveButtonText}>{saveStatus || 'Uploading...'}</Text>
+                <Text style={styles.saveButtonText}>{saveStatus || 'Saving...'}</Text>
               </>
             ) : (
               <>
@@ -331,8 +352,6 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
     </View>
   );
 };
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -367,41 +386,54 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     gap: 16,
   },
-  summaryCard: {
+  previewCard: {
+    height: 180,
     backgroundColor: Colors.white,
     borderRadius: 14,
-    padding: Spacing.md,
     borderWidth: 1,
     borderColor: '#E5E5EA',
-    gap: 12,
-  },
-  summaryCardRow: {
-    flexDirection: 'row',
+    overflow: 'hidden',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
   },
-  summaryCardTitle: {
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  pdfPreview: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  pdfTitle: {
     fontSize: Typography.sizes.md,
     fontWeight: Typography.weights.semibold,
     color: Colors.pureBlack,
   },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  summaryGridItem: {
-    width: '45%',
-    gap: 2,
-  },
-  summaryGridLabel: {
+  pdfSubtitle: {
     fontSize: Typography.sizes.xs,
     color: Colors.darkGray,
   },
-  summaryGridValue: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.pureBlack,
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#F8F9FA',
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: Typography.weights.medium,
+    color: Colors.darkGray,
+    textTransform: 'capitalize',
   },
   section: {
     backgroundColor: Colors.white,
@@ -415,9 +447,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginBottom: 4,
   },
   sectionTitle: {
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.xs,
     fontWeight: Typography.weights.semibold,
     color: Colors.darkGray,
     textTransform: 'uppercase',
@@ -461,20 +494,24 @@ const styles = StyleSheet.create({
   categoryChipTextSelected: {
     color: Colors.white,
   },
-  tagsInput: {
+  fieldRow: {
+    gap: 4,
+  },
+  fieldLabel: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.medium,
+    color: Colors.darkGray,
+    textTransform: 'capitalize',
+  },
+  fieldInput: {
     backgroundColor: '#F8F9FA',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E5EA',
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     fontSize: Typography.sizes.sm,
     color: Colors.pureBlack,
-  },
-  tagsHint: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.darkGray,
-    marginTop: -4,
   },
   textPreviewCard: {
     backgroundColor: '#F8F9FA',

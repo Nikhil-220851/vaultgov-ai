@@ -35,6 +35,8 @@ interface UploadDocumentSheetProps {
   onTakePhoto: () => Promise<void>;
   onUploadPdf: () => Promise<void>;
   onUploadImage: () => Promise<void>;
+  /** When true the Upload PDF option is dimmed and unresponsive */
+  isPdfPickingActive?: boolean;
 }
 
 interface UploadOptionProps {
@@ -42,6 +44,8 @@ interface UploadOptionProps {
   title: string;
   subtitle: string;
   onPress: () => void;
+  /** When true the row is visually dimmed and taps are ignored */
+  disabled?: boolean;
 }
 
 const UploadOption: React.FC<UploadOptionProps> = ({
@@ -49,21 +53,27 @@ const UploadOption: React.FC<UploadOptionProps> = ({
   title,
   subtitle,
   onPress,
+  disabled = false,
 }) => (
   <Pressable
-    onPress={onPress}
+    onPress={disabled ? undefined : onPress}
     accessibilityRole="button"
     accessibilityLabel={title}
-    style={({ pressed }) => [optionStyles.row, pressed && optionStyles.rowPressed]}
+    accessibilityState={{ disabled }}
+    style={({ pressed }) => [
+      optionStyles.row,
+      pressed && !disabled && optionStyles.rowPressed,
+      disabled && optionStyles.rowDisabled,
+    ]}
   >
     <View style={optionStyles.iconWell}>
-      <Ionicons name={iconName as any} size={22} color={Colors.darkGray} />
+      <Ionicons name={iconName as any} size={22} color={disabled ? '#B0B0B0' : Colors.darkGray} />
     </View>
     <View style={optionStyles.textBlock}>
-      <Text style={optionStyles.title}>{title}</Text>
+      <Text style={[optionStyles.title, disabled && optionStyles.textDisabled]}>{title}</Text>
       <Text style={optionStyles.subtitle}>{subtitle}</Text>
     </View>
-    <Ionicons name="chevron-forward" size={18} color={Colors.darkGray} />
+    <Ionicons name="chevron-forward" size={18} color={disabled ? '#C0C0C0' : Colors.darkGray} />
   </Pressable>
 );
 
@@ -77,6 +87,12 @@ const optionStyles = StyleSheet.create({
   },
   rowPressed: {
     backgroundColor: '#F4F4F4',
+  },
+  rowDisabled: {
+    opacity: 0.45,
+  },
+  textDisabled: {
+    color: '#999999',
   },
   iconWell: {
     width: 44,
@@ -114,6 +130,7 @@ export const UploadDocumentSheet: React.FC<UploadDocumentSheetProps> = ({
   onTakePhoto,
   onUploadPdf,
   onUploadImage,
+  isPdfPickingActive = false,
 }) => {
   const insets = useSafeAreaInsets();
   const [overlayOpacity] = useState(() => new Animated.Value(0));
@@ -211,8 +228,9 @@ export const UploadDocumentSheet: React.FC<UploadDocumentSheetProps> = ({
         <UploadOption
           iconName="document-outline"
           title="Upload PDF"
-          subtitle="Import from files or storage"
+          subtitle={isPdfPickingActive ? 'Opening picker…' : 'Import from files or storage'}
           onPress={onUploadPdf}
+          disabled={isPdfPickingActive}
         />
 
         <View style={sheetStyles.optionSeparator} />

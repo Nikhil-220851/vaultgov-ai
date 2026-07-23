@@ -18,9 +18,9 @@ export const ScanDocumentScreen: React.FC = () => {
     console.log('[ScanDocumentScreen] Gallery button pressed');
     const document = await pickImageFromGallery();
     if (document) {
-      console.log('[ScanDocumentScreen] Image selected, routing to preview');
+      console.log('[ScanDocumentScreen] Image selected, routing to unified document-preview');
       router.push({
-        pathname: '/scan/preview' as any,
+        pathname: '/document-preview' as any,
         params: {
           uri: document.uri,
           name: document.name,

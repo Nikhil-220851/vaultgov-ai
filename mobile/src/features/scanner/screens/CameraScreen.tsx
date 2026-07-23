@@ -57,7 +57,7 @@ export const CameraScreen: React.FC = () => {
       const fileName = `photo_${Date.now()}.jpg`;
 
       router.push({
-        pathname: '/scan/preview' as any,
+        pathname: '/document-preview' as any,
         params: {
           uri: photo.uri,
           name: fileName,
@@ -80,7 +80,7 @@ export const CameraScreen: React.FC = () => {
     const document = await pickImageFromGallery();
     if (document) {
       router.replace({
-        pathname: '/scan/preview' as any,
+        pathname: '/document-preview' as any,
         params: {
           uri: document.uri,
           name: document.name,

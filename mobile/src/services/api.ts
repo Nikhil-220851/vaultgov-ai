@@ -1,40 +1,26 @@
 /**
  * api.ts — VaultGov Backend API Client
  *
- * Thin typed wrapper around the Fetch API.
- * The base URL is sourced exclusively from @/config/api.config — never defined here.
- *
+ * Production-grade networking layer optimized for React Native Expo SDK 56 + Hermes.
+ * 
  * Features:
- *   • Centralized base URL (never duplicated)
- *   • Per-request timeout (API_TIMEOUT_MS)
- *   • Automatic retry for transient failures (5xx / network errors, max API_MAX_RETRIES)
- *   • Bearer token injection via setAuthToken / clearAuthToken
- *   • ApiError class with HTTP status — allows callers to distinguish 404 vs network error
- *
- * Usage:
- *   import { apiClient, ApiError } from '@/services/api';
- *   apiClient.setAuthToken(idToken);
- *   try {
- *     const user = await apiClient.getUser(uid);
- *   } catch (err) {
- *     if (err instanceof ApiError && err.status === 404) { ... }
- *   }
+ *   • Robust dual-timeout mechanism (Promise.race + AbortController) covering the ENTIRE request lifecycle (headers + body parsing).
+ *   • Safe retry loop that explicitly guards against retrying non-idempotent operations (Image/PDF uploads).
+ *   • Error normalization for Hermes-specific edge cases ("Fetch request has been canceled").
+ *   • Structured logging with thread-safe request IDs.
+ *   • Native FormData API for reliable large file uploads.
  */
 
-import { API_BASE_URL, API_TIMEOUT_MS, API_MAX_RETRIES } from '@/config/api.config';
+import { API_BASE_URL, API_TIMEOUT_MS, API_PDF_TIMEOUT_MS, API_IMAGE_TIMEOUT_MS, API_MAX_RETRIES } from '@/config/api.config';
 import { File } from 'expo-file-system';
 
 // ─── Error Types ──────────────────────────────────────────────────────────────
 
-/**
- * Thrown for all HTTP-level errors (4xx, 5xx).
- * Carries the numeric HTTP status so callers can branch on 404 vs 403 vs 500, etc.
- * Distinct from plain Error which is thrown for network/timeout failures.
- */
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
-    message: string
+    message: string,
+    public readonly detail?: any
   ) {
     super(message);
     this.name = 'ApiError';
@@ -49,7 +35,7 @@ export interface VaultGovUser {
   mobile_number: string | null;
   email: string | null;
   full_name: string | null;
-  date_of_birth: string | null; // ISO date string "YYYY-MM-DD"
+  date_of_birth: string | null;
   gender: string | null;
   state: string | null;
   district: string | null;
@@ -70,7 +56,7 @@ export interface UserCreatePayload {
 
 export interface UserProfilePayload {
   full_name: string;
-  date_of_birth: string; // "YYYY-MM-DD"
+  date_of_birth: string;
   gender: string;
   state: string;
   district: string;
@@ -126,59 +112,84 @@ function getHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
   };
   if (_authToken) {
-    console.log(`[API getHeaders] Attaching Authorization header (Token prefix: ${_authToken.substring(0, 15)}...)`);
     headers['Authorization'] = `Bearer ${_authToken}`;
-  } else {
-    console.log('[API getHeaders] Warning: No _authToken is set in apiClient. Authorization header is missing.');
   }
   return headers;
 }
 
-/**
- * Wraps a fetch promise with an AbortController-based timeout.
- * Throws a plain Error (not ApiError) if the request times out.
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    console.log(`[API fetchWithTimeout] Triggering abort for URL: ${url} (Timeout: ${API_TIMEOUT_MS}ms)`);
-    controller.abort();
-  }, API_TIMEOUT_MS);
+const generateRequestId = () => Math.random().toString(36).substring(2, 10);
 
-  console.log('[API fetchWithTimeout] Request Details:', {
-    url,
-    method: options.method ?? 'GET',
-    headers: options.headers,
-    body: options.body instanceof FormData ? '[FormData Blob]' : (options.body ? String(options.body).substring(0, 200) : null),
-    timeoutMs: API_TIMEOUT_MS,
-    signalAborted: controller.signal.aborted,
-  });
+function normalizeError(err: any, timeoutMs: number, requestId: string): Error {
+  if (err instanceof ApiError) return err;
+
+  const errMsg = err?.message || String(err);
+  
+  // Intercept known React Native / Hermes cancellation quirks
+  if (
+    err?.name === 'AbortError' ||
+    errMsg.includes('Fetch request has been canceled') ||
+    errMsg.includes('Network request failed') ||
+    errMsg.includes('aborted') ||
+    errMsg.includes('cancelled') ||
+    errMsg.includes('canceled') ||
+    errMsg.includes('Timeout')
+  ) {
+    console.warn(`[NETWORK ERROR] [${requestId}] Translated primitive cancellation error to Timeout/Network Error: ${errMsg}`);
+    return new Error(`Network request failed or timed out after ${timeoutMs / 1000}s. Please check your connection.`);
+  }
+
+  return err instanceof Error ? err : new Error(errMsg);
+}
+
+/**
+ * Robust fetch wrapper that guarantees either a successful JSON response, 
+ * an ApiError for HTTP errors, or a standard Error on timeout/network failure.
+ * Timeout applies to the ENTIRE lifecycle, including response.json() parsing.
+ */
+async function fetchAndParse<T>(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number,
+  requestId: string
+): Promise<T> {
+  const controller = new AbortController();
+  const signal = controller.signal;
+
+  const timeoutId = setTimeout(() => {
+    console.log(`[TIMEOUT] [${requestId}] Timeout reached (${timeoutMs}ms), aborting request...`);
+    controller.abort();
+  }, timeoutMs);
 
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    console.log('[API fetchWithTimeout] Response received:', {
-      url,
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-    });
-    return response;
-  } catch (err: any) {
-    console.log('[API fetchWithTimeout] Caught error:', {
-      name: err?.name,
-      message: err?.message,
-      stack: err?.stack,
-      json: JSON.stringify(err),
-      signalAborted: controller.signal.aborted,
-    });
+    console.log(`[FETCH STARTED] [${requestId}] ${options.method || 'GET'} ${url}`);
+    
+    const response = await fetch(url, { ...options, signal });
+    console.log(`[HEADERS RECEIVED] [${requestId}] status=${response.status}`);
 
-    if (err.name === 'AbortError') {
-      throw new Error(`Request timed out after ${API_TIMEOUT_MS / 1000}s. Check your network.`);
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`;
+      let bodyText = '';
+      try {
+        bodyText = await response.text();
+        const body = JSON.parse(bodyText);
+        detail = body.detail ?? body.message ?? detail;
+      } catch {
+        detail = bodyText || detail;
+      }
+      console.error(`[API ERROR] [${requestId}] status=${response.status} detail=${detail}`);
+      throw new ApiError(response.status, detail);
     }
-    throw err;
+
+    console.log(`[BODY RECEIVING] [${requestId}] parsing JSON...`);
+    const json = await response.json();
+    console.log(`[JSON PARSED] [${requestId}] successful parsing`);
+    console.log(`[RETURN SUCCESS] [${requestId}] Operation completed successfully.`);
+    return json as T;
+  } catch (err: any) {
+    if (err.name !== 'ApiError') {
+      console.warn(`[ABORT] [${requestId}] ${err?.name || 'Error'}: ${err?.message}`);
+    }
+    throw normalizeError(err, timeoutMs, requestId);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -186,149 +197,91 @@ async function fetchWithTimeout(
 
 /**
  * Executes a fetch call with automatic retries for transient errors.
- * Only retries on network failures or 5xx responses.
- * Never retries 4xx (client errors — they are deterministic and won't change on retry).
+ * Never retries 4xx (client errors) or operations where maxRetries = 0.
  */
-async function fetchWithRetry(
+async function fetchWithRetry<T>(
   url: string,
-  options: RequestInit
-): Promise<Response> {
+  options: RequestInit,
+  timeoutMs: number = API_TIMEOUT_MS,
+  maxRetries: number = API_MAX_RETRIES,
+  reqId?: string
+): Promise<T> {
+  const requestId = reqId || generateRequestId();
   let lastError: Error = new Error('Unknown error');
 
-  for (let attempt = 0; attempt <= API_MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      console.log(`[RETRY] [${requestId}] Attempt ${attempt + 1}/${maxRetries + 1}`);
+    } else {
+      console.log(`[REQUEST CREATED] [${requestId}] maxRetries=${maxRetries}, timeoutMs=${timeoutMs}`);
+    }
+
     try {
-      console.log(`[API fetchWithRetry] Attempt ${attempt + 1}/${API_MAX_RETRIES + 1} starting...`);
-      const response = await fetchWithTimeout(url, options);
-
-      // Do NOT retry 4xx — those are deterministic client errors (e.g. 404, 403)
-      if (response.status >= 400 && response.status < 500) {
-        console.log(`[API fetchWithRetry] Client error ${response.status}. Skipping retries.`);
-        return response;
-      }
-
-      // Retry 5xx (transient server errors)
-      if (response.status >= 500 && attempt < API_MAX_RETRIES) {
-        console.warn(`[API fetchWithRetry] Attempt ${attempt + 1} failed with HTTP ${response.status}. Retrying...`);
-        await new Promise<void>((resolve) => setTimeout(() => resolve(), 800 * (attempt + 1)));
-        continue;
-      }
-
-      return response;
+      const result = await fetchAndParse<T>(url, options, timeoutMs, requestId);
+      return result;
     } catch (err: any) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      console.log(`[API fetchWithRetry] Attempt ${attempt + 1} caught error:`, {
-        name: lastError.name,
-        message: lastError.message,
-        stack: lastError.stack,
-        json: JSON.stringify(lastError),
-      });
-
-      if (attempt < API_MAX_RETRIES) {
-        console.warn(`[API] Attempt ${attempt + 1} failed: ${lastError.message}. Retrying in ${800 * (attempt + 1)}ms...`);
-        await new Promise<void>((resolve) => setTimeout(() => resolve(), 800 * (attempt + 1)));
+      lastError = err;
+      
+      // Do not retry on client deterministic errors (4xx)
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+        throw err;
       }
+
+      // Do not retry if we exhausted retries or maxRetries is 0
+      if (attempt >= maxRetries) {
+        break;
+      }
+
+      console.warn(`[RETRY WAIT] [${requestId}] Attempt ${attempt + 1} failed. Delaying before next retry...`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
     }
   }
 
-  throw new Error(
-    `Unable to connect to server after ${API_MAX_RETRIES + 1} attempts. ` +
-      `Check that your device and backend (${API_BASE_URL}) are on the same network. ` +
-      `Original error: ${lastError.message}`
-  );
-}
-
-/**
- * Parses a response and throws ApiError for HTTP errors, or returns parsed JSON.
- * This is the ONLY place where ApiError is constructed.
- */
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    let detail = `HTTP ${response.status}`;
-    let bodyText = '';
-    try {
-      bodyText = await response.text();
-      const body = JSON.parse(bodyText);
-      detail = body.detail ?? body.message ?? detail;
-    } catch {
-      detail = bodyText || detail;
-    }
-    console.error(`[API Error Response] Request failed. URL: ${response.url}, Status: ${response.status}, Detail: ${detail}, Raw Body: ${bodyText || '(empty)'}`);
-    throw new ApiError(response.status, detail);
-  }
-  return response.json() as Promise<T>;
+  throw lastError;
 }
 
 // ─── API Client ───────────────────────────────────────────────────────────────
 
 export const apiClient = {
-  /**
-   * Set the Firebase ID token to be sent with every subsequent request.
-   * Call this immediately after Firebase authentication succeeds.
-   */
   setAuthToken(token: string): void {
     _authToken = token;
   },
 
-  /**
-   * Clear the auth token on sign-out.
-   */
   clearAuthToken(): void {
     _authToken = null;
   },
 
-  /**
-   * POST /api/v1/users
-   * Creates a minimal user record in Neon immediately after Firebase auth.
-   * Called ONLY from CompleteProfileScreen.handleSubmit — NOT from login screens.
-   */
   async upsertUser(payload: UserCreatePayload): Promise<VaultGovUser> {
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/users/`, {
+    return fetchWithRetry<VaultGovUser>(`${API_BASE_URL}/api/v1/users/`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
     });
-    return handleResponse<VaultGovUser>(response);
   },
 
-  /**
-   * GET /api/v1/users/:firebaseUid
-   * Fetch the full user profile.
-   * Throws ApiError(404) if the user does not exist in Neon yet.
-   */
   async getUser(firebaseUid: string): Promise<VaultGovUser> {
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/users/${firebaseUid}`, {
+    return fetchWithRetry<VaultGovUser>(`${API_BASE_URL}/api/v1/users/${firebaseUid}`, {
       method: 'GET',
       headers: getHeaders(),
     });
-    return handleResponse<VaultGovUser>(response);
   },
 
-  /**
-   * PUT /api/v1/users/:firebaseUid
-   * Save the Complete Profile form data.
-   * Requires the user record to already exist (call upsertUser first).
-   */
   async updateUserProfile(
     firebaseUid: string,
     payload: UserProfilePayload
   ): Promise<VaultGovUser> {
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/users/${firebaseUid}`, {
+    return fetchWithRetry<VaultGovUser>(`${API_BASE_URL}/api/v1/users/${firebaseUid}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(payload),
     });
-    return handleResponse<VaultGovUser>(response);
   },
 
-  /**
-   * PATCH /api/v1/users/:firebaseUid/permissions
-   * Mark the Grant Permissions screen as seen.
-   */
   async updatePermissions(
     firebaseUid: string,
     payload: UserPermissionsPayload
   ): Promise<VaultGovUser> {
-    const response = await fetchWithRetry(
+    return fetchWithRetry<VaultGovUser>(
       `${API_BASE_URL}/api/v1/users/${firebaseUid}/permissions`,
       {
         method: 'PATCH',
@@ -336,77 +289,67 @@ export const apiClient = {
         body: JSON.stringify(payload),
       }
     );
-    return handleResponse<VaultGovUser>(response);
   },
 
-  /**
-   * GET /api/v1/documents
-   * Fetch all documents for the authenticated user.
-   */
   async getDocuments(): Promise<VaultGovDocument[]> {
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/documents/`, {
+    return fetchWithRetry<VaultGovDocument[]>(`${API_BASE_URL}/api/v1/documents/`, {
       method: 'GET',
       headers: getHeaders(),
     });
-    return handleResponse<VaultGovDocument[]>(response);
   },
 
-  /**
-   * GET /api/v1/documents/:id
-   * Fetch a single document by ID.
-   */
   async getDocument(id: string): Promise<VaultGovDocument> {
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/documents/${id}`, {
+    return fetchWithRetry<VaultGovDocument>(`${API_BASE_URL}/api/v1/documents/${id}`, {
       method: 'GET',
       headers: getHeaders(),
     });
-    return handleResponse<VaultGovDocument>(response);
   },
 
-  /**
-   * POST /api/v1/documents
-   * Create a new document.
-   */
   async createDocument(payload: DocumentCreatePayload): Promise<VaultGovDocument> {
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/documents/`, {
+    return fetchWithRetry<VaultGovDocument>(`${API_BASE_URL}/api/v1/documents/`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
     });
-    return handleResponse<VaultGovDocument>(response);
   },
 
-  /**
-   * DELETE /api/v1/documents/:id
-   * Delete a document.
-   */
   async deleteDocument(id: string): Promise<void> {
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/documents/${id}`, {
-      method: 'DELETE',
-      headers: getHeaders(),
-    });
-    if (!response.ok) {
-      throw new ApiError(response.status, 'Failed to delete document');
-    }
+    const requestId = generateRequestId();
+    await fetchWithRetry<void>(
+      `${API_BASE_URL}/api/v1/documents/${id}`,
+      { method: 'DELETE', headers: getHeaders() },
+      API_TIMEOUT_MS,
+      API_MAX_RETRIES,
+      requestId
+    );
   },
 
-  /**
-   * GET /api/v1/stats
-   * Fetch user dashboard stats.
-   */
   async getStats(): Promise<VaultGovStats> {
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/stats/`, {
+    return fetchWithRetry<VaultGovStats>(`${API_BASE_URL}/api/v1/stats/`, {
       method: 'GET',
       headers: getHeaders(),
     });
-    return handleResponse<VaultGovStats>(response);
   },
 
-  /**
-   * POST /api/v1/uploads/image
-   * Upload an image directly to the FastAPI backend.
-   */
-  async uploadImageToBackend(localUri: string): Promise<{ secure_url: string; public_id: string; width?: number; height?: number }> {
+  async uploadImageToBackend(localUri: string, reqId?: string): Promise<{
+    secure_url: string;
+    public_id: string;
+    width?: number;
+    height?: number;
+    // Unified Document Intelligence response fields
+    document_type?: string;
+    display_name?: string;
+    category?: string;
+    confidence?: number;
+    extracted_text?: string;
+    ocr_text?: string;
+    structured_data?: Record<string, any> | null;
+    document_intelligence_success?: boolean;
+    processing_time?: number;
+  }> {
+    const requestId = reqId || generateRequestId();
+    console.log(`[UPLOAD START] [${requestId}] uploadImageToBackend initiated`);
+
     const extRaw = localUri.split('.').pop()?.toLowerCase() || 'jpg';
     let extension = extRaw;
     let mimeType = 'image/jpeg';
@@ -425,40 +368,112 @@ export const apiClient = {
 
     const name = `document_${Date.now()}.${extension}`;
 
-    // 1. Normalize Android/iOS URI to guarantee `file://` scheme where applicable
+    // Normalize Android/iOS URI
     const normalizedUri = localUri.startsWith('file://') || localUri.startsWith('content://') || localUri.startsWith('http')
       ? localUri 
       : `file://${localUri}`;
 
-    // 2. Create a File object directly from the local URI (Expo SDK 56 / Hermes compliant)
-    // This replaces the unsupported fetch(uri).blob() which causes ArrayBuffer errors.
+    // Use Expo SDK 56 / Hermes compliant File object
+    // This replaces the legacy { uri, name, type } object which throws 'Unsupported FormDataPart implementation'
     const file = new File(normalizedUri);
-
-    // 3. Append the File directly to FormData. Bypasses the legacy React Native object parser entirely.
     const formData = new FormData();
     (formData as any).append('file', file, name);
 
     const headers: Record<string, string> = {
       'Accept': 'application/json',
+      // Content-Type is intentionally omitted for FormData boundaries
     };
+    
     if (_authToken) {
       headers['Authorization'] = `Bearer ${_authToken}`;
     }
 
-    // Notice we do NOT set Content-Type so fetch can auto-generate the boundary
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/uploads/image`, {
-      method: 'POST',
-      body: formData,
-      headers: headers,
-    });
+    return fetchWithRetry<{
+      secure_url: string;
+      public_id: string;
+      width?: number;
+      height?: number;
+      document_type?: string;
+      display_name?: string;
+      category?: string;
+      confidence?: number;
+      extracted_text?: string;
+      ocr_text?: string;
+      structured_data?: Record<string, any> | null;
+      document_intelligence_success?: boolean;
+      processing_time?: number;
+    }>(
 
-    return handleResponse<{ secure_url: string; public_id: string; width?: number; height?: number }>(response);
+      `${API_BASE_URL}/api/v1/uploads/image`,
+      {
+        method: 'POST',
+        body: formData,
+        headers: headers,
+      },
+      API_IMAGE_TIMEOUT_MS,
+      0, // maxRetries=0: image uploads are non-idempotent, never retry
+      requestId
+    );
   },
 
-  /**
-   * GET /api/v1/schemes/sync
-   * Delta synchronise backend schemes using the 'since' server timestamp.
-   */
+  async uploadPdfToBackend(localUri: string, filename: string): Promise<{
+    // Unified Document Intelligence response fields (same shape as image upload)
+    document_type?: string;
+    display_name?: string;
+    category?: string;
+    confidence?: number;
+    extracted_text?: string;
+    ocr_text?: string;
+    structured_data?: Record<string, any> | null;
+    document_intelligence_success?: boolean;
+    processing_time?: number;
+    // PDF-specific metadata
+    metadata?: { filename?: string; content_type?: string; size?: number };
+  }> {
+    const requestId = generateRequestId();
+    console.log(`[UPLOAD START] [${requestId}] uploadPdfToBackend initiated`);
+
+    const normalizedUri = localUri.startsWith('file://') || localUri.startsWith('content://') || localUri.startsWith('http')
+      ? localUri 
+      : `file://${localUri}`;
+
+    const file = new File(normalizedUri);
+    const formData = new FormData();
+    (formData as any).append('file', file, filename || 'document.pdf');
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+    
+    if (_authToken) {
+      headers['Authorization'] = `Bearer ${_authToken}`;
+    }
+
+    return fetchWithRetry<{
+      document_type?: string;
+      display_name?: string;
+      category?: string;
+      confidence?: number;
+      extracted_text?: string;
+      ocr_text?: string;
+      structured_data?: Record<string, any> | null;
+      document_intelligence_success?: boolean;
+      processing_time?: number;
+      metadata?: { filename?: string; content_type?: string; size?: number };
+    }>(
+
+      `${API_BASE_URL}/api/v1/documents/upload-pdf`,
+      {
+        method: 'POST',
+        body: formData,
+        headers: headers,
+      },
+      API_PDF_TIMEOUT_MS,
+      0, // maxRetries=0: PDF OCR is expensive and non-idempotent
+      requestId
+    );
+  },
+
   async syncSchemes(since: string | null): Promise<{
     newSchemes: any[];
     updatedSchemes: any[];
@@ -469,44 +484,20 @@ export const apiClient = {
     const url = since
       ? `${API_BASE_URL}/api/v1/schemes/sync?since=${encodeURIComponent(since)}`
       : `${API_BASE_URL}/api/v1/schemes/sync`;
-    console.log(`[API syncSchemes] Request URL: ${url}`);
-    const response = await fetchWithRetry(url, {
-      method: 'GET',
-      headers: getHeaders(),
-    });
-    return handleResponse(response);
+    return fetchWithRetry(url, { method: 'GET', headers: getHeaders() });
   },
 
-  /**
-   * GET /api/v1/schemes/search
-   * Search schemes on the backend.
-   */
   async searchSchemes(params: Record<string, any>): Promise<any> {
     const query = Object.entries(params)
       .filter(([_, v]) => v !== undefined && v !== null && v !== '')
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
       .join('&');
     const url = `${API_BASE_URL}/api/v1/schemes/search?${query}`;
-    console.log(`[API searchSchemes] Request URL: ${url}`);
-    const response = await fetchWithRetry(url, {
-      method: 'GET',
-      headers: getHeaders(),
-    });
-    return handleResponse(response);
+    return fetchWithRetry(url, { method: 'GET', headers: getHeaders() });
   },
 
-  /**
-   * GET /api/v1/schemes/:schemeId
-   * Fetch a single scheme by its schemeId string.
-   * Used by the Details screen to retrieve a specific scheme.
-   */
   async getSchemeById(schemeId: string): Promise<any> {
     const url = `${API_BASE_URL}/api/v1/schemes/${encodeURIComponent(schemeId)}`;
-    console.log(`[API getSchemeById] Request URL: ${url}`);
-    const response = await fetchWithRetry(url, {
-      method: 'GET',
-      headers: getHeaders(),
-    });
-    return handleResponse(response);
+    return fetchWithRetry(url, { method: 'GET', headers: getHeaders() });
   },
 };

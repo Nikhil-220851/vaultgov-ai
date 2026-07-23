@@ -51,6 +51,8 @@ export interface OCRExtractionResult {
   fields: ExtractedField[];
   /** Raw OCR text output — useful for debugging but never shown as-is to users */
   rawText?: string;
+  /** Cloudinary URL of the uploaded image (for non-PDF pipeline) */
+  assetUri?: string;
 }
 
 // ─── Service interface ────────────────────────────────────────────────────────
@@ -61,5 +63,5 @@ export interface OCRExtractionResult {
  * Any implementation (dev mock, ML Kit, REST endpoint) must satisfy this shape.
  */
 export interface OCRService {
-  extractDocument(file: SelectedFile): Promise<OCRExtractionResult>;
+  extractDocument(file: SelectedFile, onProgress?: (stage: any) => void): Promise<OCRExtractionResult>;
 }

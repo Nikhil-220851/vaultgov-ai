@@ -35,7 +35,6 @@ import * as MediaLibrary from 'expo-media-library/legacy';
 
 import { Colors, Spacing, Typography, Radius } from '@/theme';
 import { apiClient, VaultGovDocument } from '@/services/api';
-import { storageService } from '@/services/storageService';
 import { useDocumentStore } from '../store/useDocumentStore';
 import { useStatsStore } from '@/store/useStatsStore';
 
@@ -187,11 +186,7 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
             try {
               setIsDeleting(true);
 
-              // 1. Remove the Cloudinary image if one exists
-              if (document.image_uri) {
-                await storageService.deleteDocumentImage(document.image_uri);
-              }
-
+              // 1. Remove the Cloudinary image if one exists (now handled by backend)
               // 2. Delete the backend record
               await apiClient.deleteDocument(document.id);
 

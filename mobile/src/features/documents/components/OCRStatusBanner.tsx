@@ -25,9 +25,10 @@ import { OCRStatus } from '../services/ocr.service';
 
 interface OCRStatusBannerProps {
   status: OCRStatus;
+  pdfProgress?: PdfProgressStage | null;
 }
 
-export const OCRStatusBanner: React.FC<OCRStatusBannerProps> = ({ status }) => {
+export const OCRStatusBanner: React.FC<OCRStatusBannerProps> = ({ status, pdfProgress }) => {
   const [fadeAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -41,7 +42,7 @@ export const OCRStatusBanner: React.FC<OCRStatusBannerProps> = ({ status }) => {
 
   if (status === 'idle') return null;
 
-  const config = getBannerConfig(status);
+  const config = getBannerConfig(status, pdfProgress);
 
   return (
     <Animated.View
@@ -78,15 +79,22 @@ interface BannerConfig {
   text: string;
 }
 
-function getBannerConfig(status: OCRStatus): BannerConfig {
+function getBannerConfig(status: OCRStatus, pdfProgress?: PdfProgressStage | null): BannerConfig {
   switch (status) {
     case 'processing':
+      let progressText = 'OCR processing… extracting text';
+      if (pdfProgress) {
+        if (pdfProgress === 'uploading') progressText = 'Uploading PDF... (this may take up to a minute)';
+        else if (pdfProgress === 'extracting') progressText = 'Extracting text...';
+        else if (pdfProgress === 'analyzing') progressText = 'Analyzing document...';
+        else if (pdfProgress === 'preparing') progressText = 'Preparing preview...';
+      }
       return {
         bg: '#EAF1FD',
         iconName: 'sync-outline',
         iconColor: Colors.primaryBlue,
         textColor: Colors.primaryBlue,
-        text: 'OCR processing… extracting text',
+        text: progressText,
       };
     case 'success':
       return {

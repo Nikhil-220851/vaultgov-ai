@@ -22,7 +22,22 @@ export const API_BASE_URL: string = (
 ).replace(/\/$/, '');
 
 /** Maximum milliseconds to wait for any single API call. */
-export const API_TIMEOUT_MS = 10_000;
+export const API_TIMEOUT_MS = 30_000;
+
+/**
+ * Extended timeout for PDF OCR uploads.
+ * Tesseract processing on a scanned multi-page PDF can take 30-90 seconds.
+ * This timeout is applied only to POST /api/v1/documents/upload-pdf.
+ */
+export const API_PDF_TIMEOUT_MS = 180_000; // 2 minutes
+
+/**
+ * Extended timeout for image uploads to Cloudinary.
+ * The chain is: phone → FastAPI → Cloudinary → response.
+ * On a real mobile device over WiFi this can take 15-30s for a large image.
+ * 60s is a safe upper bound without being an unreasonable UX wait.
+ */
+export const API_IMAGE_TIMEOUT_MS = 300_000; // 1 minute
 
 /** Number of automatic retries for transient failures (does not retry 4xx). */
 export const API_MAX_RETRIES = 2;

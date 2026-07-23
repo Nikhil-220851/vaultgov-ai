@@ -135,13 +135,31 @@ export async function pickFromGallery(): Promise<SelectedFile | null> {
 
 // ─── PDF Document Pick ───────────────────────────────────────────────────────
 
+/**
+ * Module-level guard: only one native document picker may be open at a time.
+ * ExpoDocumentPicker throws "Different document picking in progress" if a
+ * second getDocumentAsync() is called before the first resolves. This flag
+ * is the single source of truth — it is always reset in the finally block.
+ */
+let _isPickingDocument = false;
+
 export async function pickPdfDocument(): Promise<SelectedFile | null> {
+  if (_isPickingDocument) {
+    console.warn('[PDF Upload] Picker already open — ignoring duplicate request');
+    return null;
+  }
+
+  _isPickingDocument = true;
+  console.log('[PDF Upload] Opening document picker');
+
   try {
     const result = await DocumentPicker.getDocumentAsync({
       type: Platform.OS === 'ios' ? 'com.adobe.pdf' : 'application/pdf',
       copyToCacheDirectory: true,
       multiple: false,
     });
+
+    console.log('[PDF Upload] Picker returned:', result.canceled ? 'canceled' : `${result.assets?.length} asset(s)`);
 
     // Cancelled by user
     if (result.canceled) return null;
@@ -156,7 +174,10 @@ export async function pickPdfDocument(): Promise<SelectedFile | null> {
       source: 'pdf',
     };
   } catch (error) {
-    console.error('[UploadService] PDF pick error:', error);
+    console.error('[PDF Upload] Picker error:', error);
     return null;
+  } finally {
+    // Always release the lock so subsequent calls can proceed
+    _isPickingDocument = false;
   }
 }

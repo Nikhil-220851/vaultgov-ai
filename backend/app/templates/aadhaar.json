@@ -1,0 +1,57 @@
+{
+  "document_type": "aadhaar",
+  "display_name": "Aadhaar Card",
+  "description": "India's national biometric identity document issued by UIDAI.",
+  "required_fields": [
+    "aadhaar_number",
+    "full_name",
+    "date_of_birth",
+    "gender",
+    "address"
+  ],
+  "optional_fields": [
+    "mobile_number",
+    "email",
+    "vid",
+    "issue_date"
+  ],
+  "field_hints": {
+    "aadhaar_number": "12-digit unique ID, often printed as XXXX XXXX XXXX or XXXX-XXXX-XXXX. Never starts with 0 or 1.",
+    "full_name": "Resident's full legal name as printed on the card, typically in Title Case.",
+    "date_of_birth": "Format is DD/MM/YYYY or Year of Birth (YOB). Convert to DD/MM/YYYY when possible.",
+    "gender": "One of: Male, Female, Transgender. May be abbreviated M/F/T.",
+    "address": "Full residential address as printed. May span multiple lines. Include locality, city, state, pincode.",
+    "mobile_number": "10-digit Indian mobile number, may be partially masked (e.g. XXXXXXXX89).",
+    "email": "Email address if printed; usually masked partially.",
+    "vid": "16-digit Virtual ID (VID) if printed on the card.",
+    "issue_date": "Date of card issue if printed."
+  },
+  "aliases": {
+    "aadhaar_number": ["uid", "aadhar no", "aadhaar no", "enrollment no", "aadhaar id", "unique id", "aadhaar"],
+    "full_name": ["name", "resident name", "applicant name", "holder name"],
+    "date_of_birth": ["dob", "birth date", "born", "yob", "year of birth", "date of birth"],
+    "gender": ["sex"],
+    "address": ["addr", "residential address", "permanent address"],
+    "mobile_number": ["mobile", "phone", "contact number"],
+    "email": ["email id", "e-mail"],
+    "vid": ["virtual id", "virtual identification number"]
+  },
+  "output_field_names": {
+    "aadhaar_number": "aadhaar_number",
+    "full_name": "full_name",
+    "date_of_birth": "date_of_birth",
+    "gender": "gender",
+    "address": "address",
+    "mobile_number": "mobile_number",
+    "email": "email",
+    "vid": "vid",
+    "issue_date": "issue_date"
+  },
+  "validation_hints": {
+    "aadhaar_number": "Must be exactly 12 digits. Digits only after stripping spaces and hyphens. Must not start with 0 or 1.",
+    "date_of_birth": "Expected format DD/MM/YYYY. Year should be plausible (1900–present).",
+    "gender": "Expected: Male, Female, or Transgender.",
+    "mobile_number": "10 digits. First digit should be 6, 7, 8, or 9.",
+    "vid": "Must be exactly 16 digits."
+  }
+}

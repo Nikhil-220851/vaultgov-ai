@@ -1,7 +1,7 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.core.firebase_admin import get_current_uid
@@ -31,6 +31,143 @@ def create_document(
     user_id = _get_user_id(db, current_uid)
     doc = document_service.create_document(db, user_id, body)
     return DocumentResponse.model_validate(doc)
+
+
+@router.post("/upload-pdf")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    current_uid: str = Depends(get_current_uid),
+):
+    from app.services.pdf_service import extract_text_from_pdf
+    
+    if not file.filename.lower().endswith(".pdf"):
+        import traceback
+        print("Failing validation: Only PDF files are supported.")
+        traceback.print_stack()
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        
+    try:
+        import time
+        t_start = time.time()
+        file_bytes = await file.read()
+        print(f"===================================")
+        print(f"ENDPOINT: POST /api/v1/documents/upload-pdf")
+        print(f"CALLING: extract_text_from_pdf()")
+        print(f"===================================")
+        text = extract_text_from_pdf(file_bytes)
+        
+        # Document Intelligence Integration
+        document_intelligence_success = False
+        structured_data = None
+        doc_type = "pdf"
+        
+        # Simple detection based on OCR text
+        text_lower = text.lower()
+        if "aadhaar" in text_lower or "uidai" in text_lower:
+            doc_type = "aadhaar"
+        elif "permanent account number" in text_lower or "income tax department" in text_lower:
+            doc_type = "pan"
+        elif "passport" in text_lower:
+            doc_type = "passport"
+        elif "driving licence" in text_lower or "driving license" in text_lower or "dl no" in text_lower:
+            doc_type = "driving_license"
+
+        if doc_type != "pdf":
+            try:
+                import traceback
+                from app.services.document_intelligence.document_intelligence_service import DocumentIntelligenceService
+                from app.services.document_intelligence.models import ExtractionRequest
+                
+                print("===== DOCUMENT INTELLIGENCE =====")
+                print(f"Detected document: {doc_type}")
+                print(f"Template: {doc_type}.json")
+                print("Calling Gemini...")
+                
+                start_time = time.time()
+                svc = DocumentIntelligenceService()
+                req = ExtractionRequest(document_type=doc_type, raw_ocr_text=text)
+                response = await svc.extract(req)
+                
+                structured_data = response.model_dump().get("fields", {})
+                document_intelligence_success = True
+                
+                print(f"Gemini response time: {time.time() - start_time:.2f}s")
+                print(f"Structured fields: {len(structured_data)}")
+                print("Extraction success")
+                print("=======================================")
+            except Exception as e:
+                import traceback
+                print("===== DOCUMENT INTELLIGENCE =====")
+                print(f"Gemini extraction failed: {type(e).__name__}: {e}")
+                traceback.print_exc()
+                print("=======================================")
+                document_intelligence_success = False
+                structured_data = None
+        
+        display_names = {
+            "aadhaar": "Aadhaar Card",
+            "pan": "PAN Card",
+            "passport": "Passport",
+            "driving_license": "Driving Licence",
+            "unknown": "Unknown Document",
+            "pdf": "Document PDF"
+        }
+        categories = {
+            "aadhaar": "Identity",
+            "pan": "Identity",
+            "passport": "Identity",
+            "driving_license": "Identity",
+            "unknown": "Other",
+            "pdf": "Other"
+        }
+        
+        flat_structured = {}
+        confidence = 0.9 if document_intelligence_success else 0.0
+        if structured_data and isinstance(structured_data, dict):
+            conf_scores = []
+            for k, v in structured_data.items():
+                if isinstance(v, dict):
+                    val = v.get("value")
+                    c = v.get("confidence")
+                    if c is not None:
+                        try:
+                            conf_scores.append(float(c))
+                        except (ValueError, TypeError):
+                            pass
+                    flat_structured[k] = val
+                else:
+                    flat_structured[k] = v
+            if conf_scores:
+                confidence = sum(conf_scores) / len(conf_scores)
+
+        return {
+            "secure_url": None,
+            "public_id": None,
+            "document_type": doc_type,
+            "display_name": display_names.get(doc_type, "Document PDF"),
+            "category": categories.get(doc_type, "Other"),
+            "confidence": confidence,
+            "extracted_text": text,
+            "ocr_text": text,
+            "structured_data": flat_structured,
+            "document_intelligence_success": document_intelligence_success,
+            "processing_time": round(time.time() - t_start, 2),
+            "metadata": {
+                "filename": file.filename,
+                "content_type": file.content_type,
+                "size": len(file_bytes)
+            }
+        }
+    except ValueError as e:
+        import traceback
+        print(f"OCR/PDF Parsing Error (ValueError) in endpoint: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        print(f"Unexpected FastAPI endpoint Error: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="An error occurred while processing the PDF.")
 
 
 @router.get("/", response_model=List[DocumentResponse])

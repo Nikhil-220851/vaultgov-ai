@@ -29,6 +29,8 @@ export const DocumentsScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('All');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  // Prevents concurrent/duplicate document picker invocations
+  const [isPickingPdf, setIsPickingPdf] = useState(false);
 
   // Pull logged-in user details if available
   const user = auth.currentUser;
@@ -74,12 +76,31 @@ export const DocumentsScreen: React.FC = () => {
   }, [router]);
 
   const handleUploadPdf = useCallback(async () => {
+    console.log('[PDF Upload] Upload button pressed');
+
+    // Guard: if a picker is already open (double-tap / re-entrant call), do nothing.
+    // The module-level flag in upload.service.ts is the final backstop, but this
+    // state-level guard disables the button in the UI immediately.
+    if (isPickingPdf) {
+      console.warn('[PDF Upload] Pick already in progress, ignoring tap');
+      return;
+    }
+
     setIsSheetOpen(false);
-    setTimeout(async () => {
+    setIsPickingPdf(true);
+
+    try {
       const file = await pickPdfDocument();
-      if (file) handleFileSelected(file);
-    }, 300);
-  }, [handleFileSelected]);
+      console.log('[PDF Upload] Picker returned:', file ? file.name : 'canceled');
+      if (file) {
+        console.log('[PDF Upload] Upload started');
+        handleFileSelected(file);
+        console.log('[PDF Upload] Upload completed (navigated to preview)');
+      }
+    } finally {
+      setIsPickingPdf(false);
+    }
+  }, [handleFileSelected, isPickingPdf]);
 
   const handleUploadImage = useCallback(async () => {
     setIsSheetOpen(false);
@@ -176,6 +197,7 @@ export const DocumentsScreen: React.FC = () => {
         onTakePhoto={handleTakePhoto}
         onUploadPdf={handleUploadPdf}
         onUploadImage={handleUploadImage}
+        isPdfPickingActive={isPickingPdf}
       />
     </SafeAreaView>
   );
