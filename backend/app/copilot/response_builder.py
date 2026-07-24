@@ -6,7 +6,10 @@ suggested actions, and deep-link sources.
 """
 
 from typing import Dict, Any, List
-from app.copilot.types import ChatResponse, Intent, CopilotAction, CopilotSource
+from app.copilot.types import ChatResponse, Intent, CopilotAction, CopilotSource, CopilotCard, QuickReply
+from app.copilot.suggestions import SuggestionBuilder
+from app.copilot.cards import CardBuilder
+from app.copilot.quick_replies import QuickReplyBuilder
 
 def _serialize_doc(doc: Any) -> Dict[str, Any]:
     """Helper to convert a Document model instance into a JSON-safe dictionary."""
@@ -44,7 +47,6 @@ def build_response(
     Format a standard ChatResponse based on the detected intent and data.
     """
     message = "temporary placeholder"
-    actions: List[CopilotAction] = []
     sources: List[CopilotSource] = []
     metadata = {
         "matched_on": matched_on,
@@ -58,10 +60,6 @@ def build_response(
             "check document statuses, find documents that require renewal, "
             "or summarize your profile and upload statistics. How can I assist you today?"
         )
-        actions = [
-            CopilotAction(type="open_schemes", label="Explore Schemes", data={}),
-            CopilotAction(type="open_documents", label="View Documents", data={}),
-        ]
 
     # 2. DOCUMENT_STATUS
     elif intent == Intent.DOCUMENT_STATUS:
@@ -75,9 +73,6 @@ def build_response(
         
         if not doc_res.get("has_documents", False):
             message = "You haven't uploaded any documents yet."
-            actions = [
-                CopilotAction(type="upload_document", label="Upload Document", data={})
-            ]
         else:
             docs = doc_res.get("documents", [])
             doc_lines = []
@@ -93,9 +88,6 @@ def build_response(
                 doc_lines.append(f"- {doc.title}{category_part} [Status: {status_label}]")
             
             message = "Here are your uploaded documents:\n" + "\n".join(doc_lines)
-            actions = [
-                CopilotAction(type="open_documents", label="Manage Documents", data={})
-            ]
             sources = [
                 CopilotSource(type="document", id=str(doc.id), title=doc.title)
                 for doc in docs
@@ -121,17 +113,13 @@ def build_response(
                 doc_lines.append(f"- {doc.title}{expiry_info}")
             
             message = "The following documents require renewal or action:\n" + "\n".join(doc_lines)
-            actions = [
-                CopilotAction(type="upload_document", label="Update Document", data={}),
-                CopilotAction(type="open_documents", label="View Documents", data={}),
-            ]
             sources = [
                 CopilotSource(type="document", id=str(doc.id), title=doc.title)
                 for doc in docs
             ]
 
-    # 4. ACTIVE_SCHEMES or ELIGIBILITY
-    elif intent == Intent.ACTIVE_SCHEMES or intent == Intent.ELIGIBILITY:
+    # 4. ACTIVE_SCHEMES
+    elif intent == Intent.ACTIVE_SCHEMES:
         scheme_res = resolver_data.get("schemes", {})
         serialized_schemes = [_serialize_scheme(s) for s in scheme_res.get("schemes", [])]
         metadata["schemes"] = {
@@ -139,7 +127,7 @@ def build_response(
             "count": scheme_res.get("count", 0),
             "schemes": serialized_schemes
         }
-        
+
         if not scheme_res.get("has_schemes", False):
             message = "There are no active schemes available at the moment."
         else:
@@ -149,17 +137,121 @@ def build_response(
             for s in top_schemes:
                 deadline = f" (End Date: {s.applicationEnd})" if s.applicationEnd else ""
                 scheme_lines.append(f"- {s.title}{deadline}")
-            
+
             message = "Here are the active schemes available:\n" + "\n".join(scheme_lines)
             if len(schemes) > 5:
                 message += f"\n...and {len(schemes) - 5} more schemes."
-            actions = [
-                CopilotAction(type="open_schemes", label="Go to Scheme Centre", data={})
-            ]
             sources = [
                 CopilotSource(type="scheme", id=s.schemeId, title=s.title, url=s.officialApplyLink)
                 for s in top_schemes
             ]
+
+    # 5. ELIGIBILITY — personalized engine-backed result
+    elif intent == Intent.ELIGIBILITY:
+        elig_res = resolver_data.get("eligibility", {})
+
+        eligible_schemes      = elig_res.get("eligible_schemes", [])
+        partially_eligible    = elig_res.get("partially_eligible", [])
+        not_eligible          = elig_res.get("not_eligible", [])
+        insufficient_info     = elig_res.get("insufficient_information", [])
+        missing_docs          = elig_res.get("missing_documents", [])
+        missing_fields        = elig_res.get("missing_profile_fields", [])
+        profile_completion    = elig_res.get("profile_completion", {})
+        completion_pct        = profile_completion.get("percentage", 0)
+
+        metadata["eligibility"] = {
+            "eligible_count":          len(eligible_schemes),
+            "partially_eligible_count": len(partially_eligible),
+            "not_eligible_count":       len(not_eligible),
+            "insufficient_info_count":  len(insufficient_info),
+            "missing_documents":        missing_docs,
+            "missing_profile_fields":   missing_fields,
+            "profile_completion_pct":   completion_pct,
+            "top_eligible_schemes":     eligible_schemes[:3],
+        }
+
+        if missing_fields and not eligible_schemes and not partially_eligible:
+            # Profile too incomplete for meaningful evaluation
+            missing_text = ", ".join(missing_fields)
+            message = (
+                f"Your profile is {completion_pct}% complete. "
+                f"To accurately assess your eligibility, please provide: {missing_text}. "
+                "Once complete, I can match you with the right schemes."
+            )
+        else:
+            # Build natural-language summary
+            lines = []
+
+            if eligible_schemes:
+                lines.append(f"✅ You are fully eligible for **{len(eligible_schemes)} scheme(s)**.")
+                for s in eligible_schemes[:3]:
+                    conf = s.get("confidence", 0)
+                    lines.append(f"  • {s['scheme_name']} (Match: {conf}%)")
+
+            if partially_eligible:
+                lines.append(f"\n📋 **{len(partially_eligible)} scheme(s)** need missing documents:")
+                for s in partially_eligible[:2]:
+                    docs = ", ".join(s.get("missing_documents", [])[:2])
+                    lines.append(f"  • {s['scheme_name']} — upload: {docs}")
+
+            if insufficient_info:
+                lines.append(
+                    f"\n⚠️ **{len(insufficient_info)} scheme(s)** need more profile information "
+                    f"({', '.join(missing_fields[:3])})."
+                )
+
+            if not eligible_schemes and not partially_eligible:
+                lines.append(
+                    "You are currently not eligible for any active scheme. "
+                    "Complete your profile and upload required documents to improve your matches."
+                )
+
+            message = "\n".join(lines) if lines else "Eligibility evaluation is complete. Check the Scheme Centre for details."
+
+            # Actions
+
+            # Sources — top 3 eligible schemes
+            sources = [
+                CopilotSource(type="scheme", id=s["scheme_id"], title=s["scheme_name"])
+                for s in eligible_schemes[:3]
+            ]
+
+    # 6. ELIGIBILITY_REASON — explain WHY user is not eligible for a scheme
+    elif intent == Intent.ELIGIBILITY_REASON:
+        elig_res = resolver_data.get("eligibility", {})
+
+        not_eligible_schemes = elig_res.get("not_eligible", [])
+        insufficient_info    = elig_res.get("insufficient_information", [])
+        missing_fields       = elig_res.get("missing_profile_fields", [])
+
+        metadata["eligibility"] = {
+            "not_eligible_count":      len(not_eligible_schemes),
+            "insufficient_info_count": len(insufficient_info),
+            "missing_profile_fields":  missing_fields,
+        }
+
+        if not not_eligible_schemes and not insufficient_info:
+            message = (
+                "Based on your current profile, you appear eligible for at least some schemes. "
+                "Visit the Scheme Centre to see your full eligibility breakdown."
+            )
+        else:
+            lines = []
+            if missing_fields:
+                lines.append(
+                    f"Your profile is incomplete. Missing: {', '.join(missing_fields)}. "
+                    "This prevents accurate eligibility assessment for some schemes."
+                )
+            if not_eligible_schemes:
+                lines.append(f"\nYou do not currently qualify for {len(not_eligible_schemes)} scheme(s). Common reasons:")
+                for s in not_eligible_schemes[:3]:
+                    failed = s.get("failed_rules", [])
+                    if failed:
+                        reason = failed[0].get("reason", "Criteria mismatch")
+                        lines.append(f"  • {s['scheme_name']}: {reason}")
+            message = "\n".join(lines)
+
+        sources = []
 
     # 5. PROFILE_SUMMARY
     elif intent == Intent.PROFILE_SUMMARY:
@@ -177,9 +269,6 @@ def build_response(
                 "Your profile is complete! You have provided your name, date of birth, gender, state, district, occupation, and annual income. "
                 "This information is used to match you with eligible government schemes."
             )
-            actions = [
-                CopilotAction(type="open_schemes", label="Explore Schemes", data={})
-            ]
         else:
             missing_fields = profile_res.get("missing_fields", [])
             missing_text = ", ".join(missing_fields)
@@ -187,9 +276,6 @@ def build_response(
                 f"Your profile is currently incomplete. To match you with eligible schemes, "
                 f"please complete your profile. Missing fields: {missing_text}."
             )
-            actions = [
-                CopilotAction(type="complete_profile", label="Complete Profile", data={})
-            ]
 
     # 6. APPLICATION_STATISTICS
     elif intent == Intent.APPLICATION_STATISTICS:
@@ -209,10 +295,6 @@ def build_response(
             f"- Categories Covered: {stats.get('total_categories', 0)}\n"
             f"- Estimated Storage: {storage_mb:.1f} MB"
         )
-        actions = [
-            CopilotAction(type="open_documents", label="View Uploads", data={}),
-            CopilotAction(type="open_schemes", label="View Schemes", data={}),
-        ]
         recent = stats.get("recent_uploads", [])
         sources = [
             CopilotSource(type="document", id=str(doc.id), title=doc.title)
@@ -230,10 +312,6 @@ def build_response(
             "- Summarize upload statistics (\"Show my stats\")\n\n"
             "How can I assist you today?"
         )
-        actions = [
-            CopilotAction(type="open_schemes", label="Go to Scheme Centre", data={}),
-            CopilotAction(type="open_documents", label="Manage Documents", data={}),
-        ]
 
     # 8. Unsupported / Fallback
     else:
@@ -242,17 +320,19 @@ def build_response(
             "You can ask me about your documents, active government schemes, "
             "eligibility, your profile status, or upload statistics."
         )
-        actions = [
-            CopilotAction(type="open_schemes", label="Explore Schemes", data={}),
-            CopilotAction(type="open_documents", label="View Documents", data={}),
-        ]
         sources = []
+
+    actions = SuggestionBuilder.get(intent, metadata)
+    cards = CardBuilder.build(intent, metadata)
+    quick_replies = QuickReplyBuilder.build(intent, metadata)
 
     return ChatResponse(
         message=message,
         intent=intent,
         confidence=confidence,
         actions=actions,
+        cards=cards,
+        quick_replies=quick_replies,
         sources=sources,
         metadata=metadata
     )

@@ -8,7 +8,9 @@ from app.api.uploads import router as uploads_router
 from app.api.schemes import router as schemes_router
 from app.api.dashboard import router as dashboard_router
 from app.api.scheme_recommendations import router as scheme_recommendations_router
+from app.api.conversations import router as conversations_router
 from app.copilot.chat import router as copilot_router
+from app.ai.router import router as ai_router
 from app.core.firebase_admin import initialize_firebase
 from app.database.connection import test_connection, DATABASE_URL
 from app.services.scheme_sync_job import SyncScheduler
@@ -37,7 +39,9 @@ app.include_router(uploads_router, prefix="/api/v1")
 app.include_router(schemes_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(scheme_recommendations_router, prefix="/api/v1")
+app.include_router(conversations_router, prefix="/api")
 app.include_router(copilot_router, prefix="/api")
+app.include_router(ai_router, prefix="/api")
 
 # ─── Scheduler ────────────────────────────────────────────────────────────────
 scheduler = SyncScheduler(DATABASE_URL)
@@ -88,12 +92,13 @@ def startup_event() -> None:
     scheme_count = sum(1 for path, _ in all_routes if path.startswith("/api/v1/schemes"))
     print(f"[OK] Schemes router verified - {scheme_count} scheme endpoints registered.")
 
-    scheduler.start()
+    #scheduler.start()
 
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:
-    scheduler.stop()
+    pass
+    #scheduler.stop()
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────

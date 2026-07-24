@@ -77,6 +77,8 @@ class ChatRequest(BaseModel):
     message : str
         The natural-language message from the user.
         Must be a non-empty string (max 2 000 chars to avoid abuse).
+    conversation_id : str, optional
+        ID of an existing conversation to resume.
     """
 
     message: str = Field(
@@ -85,6 +87,10 @@ class ChatRequest(BaseModel):
         max_length=2_000,
         description="User's natural-language message.",
         examples=["What government schemes am I eligible for?"],
+    )
+    conversation_id: Optional[str] = Field(
+        None,
+        description="Optional ID of an existing conversation."
     )
 
 
@@ -128,6 +134,33 @@ class CopilotSource(BaseModel):
     url: Optional[str] = Field(None, description="Deep-link or external URL.")
 
 
+class CopilotCard(BaseModel):
+    """
+    A UI card representing structured backend data.
+
+    Attributes
+    ----------
+    type  : str   Card type (e.g. "scheme", "document").
+    data  : dict  Arbitrary payload to render the card.
+    """
+
+    type: str = Field(..., description="Card type identifier.")
+    data: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Structured data for the card.",
+    )
+
+
+class QuickReply(BaseModel):
+    """
+    A context-aware chip that acts as one-tap user input.
+    """
+    version: int = Field(default=1, description="Schema version.")
+    id: str = Field(..., description="Analytics-friendly identifier.")
+    label: str = Field(..., description="Short button text displayed to user.")
+    message: str = Field(..., description="Text sent as user input when tapped.")
+
+
 # ── Response ──────────────────────────────────────────────────────────────────
 
 
@@ -141,6 +174,8 @@ class ChatResponse(BaseModel):
     intent     : Intent              Detected intent (typed enum, serialises to string).
     confidence : float               Intent confidence score in [0.0, 1.0].
     actions    : List[CopilotAction] Suggested actions for the mobile client.
+    cards      : List[CopilotCard]   Rich UI cards generated from backend data.
+    quick_replies: List[QuickReply]  Conversational quick reply chips.
     sources    : List[CopilotSource] Sources cited by this response.
     metadata   : Dict[str, Any]      Free-form bag for future fields (latency, model,
                                      tokens used, conversation ID, debug info, etc.).
@@ -162,6 +197,14 @@ class ChatResponse(BaseModel):
         default_factory=list,
         description="Suggested follow-up actions.",
     )
+    cards: List[CopilotCard] = Field(
+        default_factory=list,
+        description="Rich UI cards.",
+    )
+    quick_replies: List[QuickReply] = Field(
+        default_factory=list,
+        description="Conversational quick reply chips.",
+    )
     sources: List[CopilotSource] = Field(
         default_factory=list,
         description="Sources referenced by this response.",
@@ -174,3 +217,4 @@ class ChatResponse(BaseModel):
             "follow_up_suggestions, debug."
         ),
     )
+

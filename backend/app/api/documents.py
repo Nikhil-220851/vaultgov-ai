@@ -8,6 +8,7 @@ from app.core.firebase_admin import get_current_uid
 from app.database.connection import get_db
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
 from app.services import document_service, user_service
+from app.copilot.eligibility_engine import invalidate_eligibility_cache
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -30,6 +31,7 @@ def create_document(
 ) -> DocumentResponse:
     user_id = _get_user_id(db, current_uid)
     doc = document_service.create_document(db, user_id, body)
+    invalidate_eligibility_cache(current_uid)
     return DocumentResponse.model_validate(doc)
 
 
@@ -291,3 +293,4 @@ def delete_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
         )
+    invalidate_eligibility_cache(current_uid)

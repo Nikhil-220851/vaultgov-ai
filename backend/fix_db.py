@@ -6,7 +6,7 @@ engine = create_engine(url)
 
 try:
     with engine.begin() as conn:
-        conn.execute(text("UPDATE alembic_version SET version_num = '002'"))
-        print("Updated alembic_version to 002")
+        conn.execute(text("UPDATE alembic_version SET version_num = 'd1e2f3a4b5c6'"))
+        print("Updated alembic_version to d1e2f3a4b5c6")
 except Exception as e:
     print("Error updating:", e)

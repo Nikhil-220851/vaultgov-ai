@@ -11,6 +11,7 @@ interface ChatInputProps {
   placeholder?: string;
   onAttachPress?: () => void;
   onVoicePress?: () => void;
+  isLoading?: boolean;
 }
 
 export function ChatInput({
@@ -20,6 +21,7 @@ export function ChatInput({
   placeholder = 'Ask GovAssist AI...',
   onAttachPress,
   onVoicePress,
+  isLoading = false,
 }: ChatInputProps) {
   const inputRef = useRef<TextInput>(null);
 
@@ -67,10 +69,10 @@ export function ChatInput({
       <TouchableOpacity
         style={[
           styles.sendBtn,
-          !value.trim() ? styles.sendBtnDisabled : styles.sendBtnActive,
+          (!value.trim() || isLoading) ? styles.sendBtnDisabled : styles.sendBtnActive,
         ]}
         onPress={handleSend}
-        disabled={!value.trim()}
+        disabled={!value.trim() || isLoading}
         activeOpacity={0.8}
       >
         <Ionicons name="send" size={18} color="#FFFFFF" />

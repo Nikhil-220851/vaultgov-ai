@@ -189,6 +189,27 @@ export interface RecommendationsSummary {
   top_missing: string[];
 }
 
+export interface Conversation {
+  id: string;
+  title: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  assistant_data?: any;
+  created_at: string;
+}
+
+export interface ConversationWithMessages extends Conversation {
+  messages: ConversationMessage[];
+}
+
 // ─── Internal state ───────────────────────────────────────────────────────────
 
 let _authToken: string | null = null;
@@ -610,32 +631,90 @@ export const apiClient = {
    * POST /api/copilot/chat
    * Chat with the VaultGov Copilot.
    */
-  async chatWithCopilot(message: string): Promise<{
+  async chatWithCopilot(message: string, conversation_id?: string, signal?: AbortSignal): Promise<{
     message: string;
     intent: string;
     confidence: number;
     actions: { type: string; label: string; data?: any }[];
+    cards?: any[];
+    quick_replies?: any[];
     sources: { type: string; id: string; title: string; url?: string }[];
     metadata: Record<string, any>;
   }> {
     const url = `${API_BASE_URL}/api/copilot/chat`;
     const headers = getHeaders();
-    const reqBody = JSON.stringify({ message });
+    const payload: any = { message };
+    if (conversation_id) payload.conversation_id = conversation_id;
+    const reqBody = JSON.stringify(payload);
+    
     console.log(`[API chatWithCopilot] Request URL: ${url}`);
     console.log('[API chatWithCopilot] Request Headers:', JSON.stringify(headers, null, 2));
     console.log('[API chatWithCopilot] Request Body:', reqBody);
+    
     const response = await fetchWithRetry<{
       message: string;
       intent: string;
       confidence: number;
       actions: { type: string; label: string; data?: any }[];
+      cards?: any[];
+      quick_replies?: any[];
       sources: { type: string; id: string; title: string; url?: string }[];
       metadata: Record<string, any>;
     }>(url, {
       method: 'POST',
       headers: headers,
       body: reqBody,
+      signal,
     });
     return response;
+  },
+
+  /**
+   * GET /api/copilot/conversations
+   * Fetch recent conversations for user.
+   */
+  async getConversations(limit: number = 20, offset: number = 0): Promise<Conversation[]> {
+    const url = `${API_BASE_URL}/api/copilot/conversations?limit=${limit}&offset=${offset}`;
+    return fetchWithRetry<Conversation[]>(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+  },
+
+  /**
+   * GET /api/copilot/conversations/:id
+   * Fetch conversation history by ID.
+   */
+  async getConversationHistory(id: string): Promise<ConversationWithMessages> {
+    const url = `${API_BASE_URL}/api/copilot/conversations/${encodeURIComponent(id)}`;
+    return fetchWithRetry<ConversationWithMessages>(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+  },
+
+  /**
+   * PATCH /api/copilot/conversations/:id
+   * Rename a conversation.
+   */
+  async renameConversation(id: string, title: string): Promise<Conversation> {
+    const url = `${API_BASE_URL}/api/copilot/conversations/${encodeURIComponent(id)}`;
+    return fetchWithRetry<Conversation>(url, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ title }),
+    });
+  },
+
+  /**
+   * DELETE /api/copilot/conversations/:id
+   * Delete a conversation.
+   */
+  async deleteConversation(id: string): Promise<void> {
+    const url = `${API_BASE_URL}/api/copilot/conversations/${encodeURIComponent(id)}`;
+    return fetchWithRetry<void>(url, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
   },
 };

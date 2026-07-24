@@ -6,13 +6,18 @@ Design
 Detection is purely local — no network calls, no database queries, no AI.
 It uses two techniques in sequence:
 
-  1. Priority pattern matching  (regex, ordered by specificity)
-     Checked first. More specific patterns (e.g. ELIGIBILITY_REASON) are
-     evaluated before broader ones (e.g. ELIGIBILITY) so the first match wins.
+  1. Advanced Greeting Detection
+     Checks for specific conversational greetings. If found, it remembers it but 
+     continues evaluating actionable intents so that things like "Hi, show my Aadhaar"
+     route to the correct intent instead of overriding.
 
-  2. Keyword fallback
+  2. Priority pattern matching  (regex, ordered by specificity)
+     Checked against preprocessed/normalized text. More specific patterns 
+     are evaluated before broader ones.
+
+  3. Keyword fallback
      If no regex matches, the message is split into tokens and compared
-     against per-intent keyword sets. Useful for terse inputs like "Hi".
+     against per-intent keyword sets.
 
 Both layers are case-insensitive and strip punctuation before matching.
 
@@ -26,23 +31,17 @@ IntentResult
                    0.0  UNKNOWN / UNSUPPORTED
     matched_on — human-readable hint of what triggered the classification
                  (useful for debugging / future logging)
-
-Out-of-scope Detection
------------------------
-If the message contains no VaultGov-related signal at all (no government,
-document, scheme, or app keyword), it is classified as UNSUPPORTED with
-confidence 0.0.  Greetings are detected before the out-of-scope check.
 """
 
 import re
 from dataclasses import dataclass, field
 from typing import Optional
+from rapidfuzz import fuzz, process
 
 from app.copilot.types import Intent
 
 
 # ── Result model ──────────────────────────────────────────────────────────────
-
 
 @dataclass
 class IntentResult:
@@ -55,33 +54,16 @@ class IntentResult:
     confidence : float    Detection confidence in [0.0, 1.0].
     matched_on : str      Debug hint — what rule/keyword triggered this result.
     """
-
     intent: Intent
     confidence: float
     matched_on: str = field(default="")
 
 
 # ── Pattern rules (ordered — first match wins) ────────────────────────────────
-#
-# Each entry is a tuple:
-#   (Intent, compiled_regex, confidence, label)
-#
-# ORDER MATTERS: put more specific patterns before broader siblings.
-# e.g.  ELIGIBILITY_REASON must come before ELIGIBILITY.
-#       DOCUMENT_REMINDER  must come before DOCUMENT_STATUS.
 
 _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
-    # ── GREETING ──────────────────────────────────────────────────────────────
-    (
-        Intent.GREETING,
-        re.compile(
-            r"\b(hi|hello|hey|namaste|good\s?(morning|afternoon|evening)|howdy|greetings)\b",
-            re.IGNORECASE,
-        ),
-        1.0,
-        "greeting_pattern",
-    ),
-
+    # GREETING intent is now handled separately by detect_greeting()
+    
     # ── SCHEME_COMPARE ────────────────────────────────────────────────────────
     (
         Intent.SCHEME_COMPARE,
@@ -93,7 +75,18 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
         "compare_pattern",
     ),
 
-    # ── ELIGIBILITY_REASON (must be before ELIGIBILITY) ───────────────────────
+    # ── ELIGIBILITY ───────────────────────────────────────────────────────────
+    (
+        Intent.ELIGIBILITY,
+        re.compile(
+            r"\b(eligibl(e|ity)|qualif(y|ied|ication)|can\s+i\s+apply|can\s+i\s+get)\b",
+            re.IGNORECASE,
+        ),
+        1.0,
+        "eligibility_pattern",
+    ),
+
+    # ── ELIGIBILITY_REASON (fallback if anything specific is needed, though covered above) ───────────────────────
     (
         Intent.ELIGIBILITY_REASON,
         re.compile(
@@ -104,22 +97,6 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
         ),
         1.0,
         "eligibility_reason_pattern",
-    ),
-
-    # ── ELIGIBILITY ───────────────────────────────────────────────────────────
-    (
-        Intent.ELIGIBILITY,
-        re.compile(
-            r"\b(am\s+i\s+eligible"
-            r"|eligible\s+for"
-            r"|do\s+i\s+qualify"
-            r"|can\s+i\s+apply"
-            r"|eligibility\s+criteria"
-            r"|who\s+(can|is)\s+(apply|eligible))\b",
-            re.IGNORECASE,
-        ),
-        1.0,
-        "eligibility_pattern",
     ),
 
     # ── REQUIRED_DOCUMENTS ────────────────────────────────────────────────────
@@ -141,7 +118,7 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
     (
         Intent.DOCUMENT_REMINDER,
         re.compile(
-            r"\b(expir(e|ing|ed|ation|y)"
+            r"\b(expir(e|es|ing|ed|ation|y)"
             r"|documents?\s+expir"
             r"|which\s+documents?\s+expir"
             r"|renew(al)?\s+remind"
@@ -228,31 +205,22 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
 
 
 # ── Keyword fallback rules ────────────────────────────────────────────────────
-#
-# Used when no regex fires.  A message must contain at least one keyword from
-# the set to match.  Evaluated in the listed order; first match wins.
-#
-# Format:  (Intent, frozenset_of_keywords, confidence, label)
 
 _KEYWORD_RULES: list[tuple[Intent, frozenset, float, str]] = [
-    (Intent.GREETING,           frozenset({"hi", "hello", "hey", "namaste", "howdy"}),                            0.75, "greeting_kw"),
     (Intent.SCHEME_COMPARE,     frozenset({"compare", "vs", "versus", "difference"}),                             0.75, "compare_kw"),
     (Intent.ELIGIBILITY_REASON, frozenset({"ineligible", "disqualified", "rejected", "why not"}),                 0.75, "elig_reason_kw"),
     (Intent.ELIGIBILITY,        frozenset({"eligible", "eligibility", "qualify", "qualification", "criteria"}),   0.75, "eligibility_kw"),
     (Intent.REQUIRED_DOCUMENTS, frozenset({"required", "mandatory", "needed", "compulsory"}),                     0.75, "req_docs_kw"),
-    (Intent.DOCUMENT_REMINDER,  frozenset({"expiry", "expiration", "expired", "expiring", "reminder"}),           0.75, "doc_reminder_kw"),
+    (Intent.DOCUMENT_REMINDER,  frozenset({"expiry", "expiration", "expired", "expiring", "expires", "reminder"}),           0.75, "doc_reminder_kw"),
     (Intent.DOCUMENT_UPLOAD,    frozenset({"upload", "attach", "submit", "aadhaar", "pan", "passport"}),          0.75, "doc_upload_kw"),
     (Intent.DOCUMENT_STATUS,    frozenset({"status", "verified", "approved", "pending", "rejected"}),             0.75, "doc_status_kw"),
     (Intent.RENEWAL_GUIDE,      frozenset({"renew", "renewal", "update", "reissue"}),                             0.75, "renewal_kw"),
-    (Intent.SCHEME_EXPLAIN,     frozenset({"scheme", "yojana", "programme", "program", "pmegp", "mudra", "pmay", "pmkisan", "ayushman"}), 0.75, "scheme_explain_kw"),
+    (Intent.SCHEME_EXPLAIN,     frozenset({"scheme", "schemes", "yojana", "programme", "program", "pmegp", "mudra", "pmay", "pmkisan", "ayushman"}), 0.75, "scheme_explain_kw"),
     (Intent.APP_HELP,           frozenset({"help", "guide", "tutorial", "how", "use", "feature", "vault"}),       0.75, "app_help_kw"),
 ]
 
 
 # ── Out-of-scope guard ────────────────────────────────────────────────────────
-#
-# If the message contains none of these anchor terms, it almost certainly
-# has nothing to do with VaultGov and is classified UNSUPPORTED.
 
 _VAULTGOV_ANCHORS: frozenset[str] = frozenset({
     "scheme", "yojana", "document", "aadhaar", "pan", "passport",
@@ -263,14 +231,79 @@ _VAULTGOV_ANCHORS: frozenset[str] = frozenset({
     "licence", "license", "certificate", "compare", "explain",
 })
 
+# ── Greeting configuration ────────────────────────────────────────────────────
+
+_VALID_GREETINGS = {
+    "hi", "hello", "hey", "hlo", "yo", "sup", 
+    "namaste", "howdy", "greetings"
+}
+
+_MULTI_WORD_GREETINGS = {
+    "good morning", "good afternoon", "good evening"
+}
+
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def preprocess_text(text: str) -> str:
+    """
+    Prepares text for intent classification by normalizing casing, 
+    spacing, punctuation, and chat variations (like repeated letters).
+    """
+    if not text:
+        return ""
+        
+    # 1. Lowercase
+    text = text.lower()
+    
+    # 2. Remove unnecessary punctuation (keep alphanumerics and spaces)
+    text = re.sub(r"[^\w\s]", " ", text)
+    
+    # 3. Normalize repeated letters
+    # Rule A: Reduce 3+ of ANY identical consecutive characters to just 1.
+    # Safely handles extreme typos (e.g., "heeeello" -> "helo") without destroying 
+    # legitimate double letters like 'll' in "hello".
+    text = re.sub(r'(.)\1{2,}', r'\1', text)
+    
+    # Rule B: Specific normalization for trailing chat repetitions.
+    # Replaces 2+ of 'i', 'y', or 'o' at the end of a word with a single letter.
+    # Handles: "hii" -> "hi", "heyy" -> "hey", "helloo" -> "hello", "hloo" -> "hlo"
+    text = re.sub(r'([iyo])\1+\b', r'\1', text)
+    
+    # 4. Remove extra spaces and strip
+    text = re.sub(r"\s+", " ", text).strip()
+    
+    return text
 
-def _normalise(text: str) -> str:
-    """Lower-case and strip punctuation (keeps spaces and alphanumerics)."""
-    return re.sub(r"[^\w\s]", " ", text.lower())
-
+def detect_greeting(normalised_text: str) -> bool:
+    """
+    Detects if the text contains a greeting using exact and fuzzy matching.
+    """
+    if not normalised_text:
+        return False
+        
+    # 1. Multi-word exact match (fast path for "good morning" etc.)
+    for mwg in _MULTI_WORD_GREETINGS:
+        if mwg in normalised_text:
+            return True
+            
+    tokens = set(normalised_text.split())
+    
+    # 2. Exact token matching for standard greetings
+    if tokens.intersection(_VALID_GREETINGS):
+        return True
+        
+    # 3. Fuzzy matching for slight spelling mistakes (e.g., "helo", "hllo")
+    for token in tokens:
+        # Skip very short tokens to avoid false positives (e.g., "a", "i")
+        if len(token) < 3:
+            continue
+            
+        best_match = process.extractOne(token, _VALID_GREETINGS, scorer=fuzz.ratio)
+        if best_match and best_match[1] >= 85:
+            return True
+            
+    return False
 
 def _has_vaultgov_signal(normalised: str) -> bool:
     """Return True if the normalised message contains any VaultGov anchor."""
@@ -279,7 +312,6 @@ def _has_vaultgov_signal(normalised: str) -> bool:
         if anchor in tokens or any(anchor in tok for tok in tokens):
             return True
     return False
-
 
 def detect_intent(message: str) -> IntentResult:
     """
@@ -300,22 +332,31 @@ def detect_intent(message: str) -> IntentResult:
     if not message or not message.strip():
         return IntentResult(intent=Intent.UNKNOWN, confidence=0.0, matched_on="empty_message")
 
-    normalised = _normalise(message)
+    # PREPROCESSING
+    normalised = preprocess_text(message)
 
-    # ── 1. Priority regex patterns ────────────────────────────────────────────
+    # 1. Detect if there's a greeting. We don't return immediately!
+    # We want to let actionable intents like DOCUMENT_STATUS run first.
+    is_greeting = detect_greeting(normalised)
+
+    # 2. Priority regex patterns on NORMALIZED text
     for intent, pattern, confidence, label in _PATTERN_RULES:
-        if pattern.search(message):            # raw message preserves case hints
+        if pattern.search(normalised):
             return IntentResult(intent=intent, confidence=confidence, matched_on=label)
 
-    # ── 2. Keyword fallback ───────────────────────────────────────────────────
+    # 3. Keyword fallback
     tokens = set(normalised.split())
     for intent, keywords, confidence, label in _KEYWORD_RULES:
-        if tokens & keywords:                  # set intersection — any match
+        if tokens & keywords:
             return IntentResult(intent=intent, confidence=confidence, matched_on=label)
 
-    # ── 3. Out-of-scope guard ─────────────────────────────────────────────────
+    # 4. If it was a greeting and NO other intent matched, now we can return GREETING
+    if is_greeting:
+        return IntentResult(intent=Intent.GREETING, confidence=1.0, matched_on="greeting_fuzzy")
+
+    # 5. Out-of-scope guard
     if not _has_vaultgov_signal(normalised):
         return IntentResult(intent=Intent.UNSUPPORTED, confidence=0.0, matched_on="no_vaultgov_signal")
 
-    # ── 4. Unknown fallback ───────────────────────────────────────────────────
+    # 6. Unknown fallback
     return IntentResult(intent=Intent.UNKNOWN, confidence=0.0, matched_on="no_match")

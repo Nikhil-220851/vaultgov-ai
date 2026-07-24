@@ -27,16 +27,35 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 // (the app was initialized above), but the Auth instance may also already exist.
 // Calling initializeAuth on an already-initialized Auth throws "Firebase: Firebase App named
 // '[DEFAULT]' already exists". getAuth() safely returns the existing instance.
-let _auth: Auth;
-try {
-  _auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} catch {
-  // Auth already initialized (hot-reload) — reuse existing instance
-  _auth = getAuth(app);
+let _auth: Auth | null = null;
+
+function getFirebaseAuth(): Auth {
+  if (!_auth) {
+    try {
+      _auth = initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+    } catch {
+      _auth = getAuth(app);
+    }
+  }
+  return _auth;
 }
-export const auth: Auth = _auth;
+
+export const auth = new Proxy({} as Auth, {
+  get(target, prop, receiver) {
+    const instance = getFirebaseAuth();
+    const value = Reflect.get(instance, prop);
+    if (typeof value === 'function') {
+      return value.bind(instance);
+    }
+    return value;
+  },
+  set(target, prop, value, receiver) {
+    const instance = getFirebaseAuth();
+    return Reflect.set(instance, prop, value);
+  }
+});
 
 
 export default app;

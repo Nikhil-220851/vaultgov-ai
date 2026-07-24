@@ -1,6 +1,3 @@
-import React from 'react';
-import { GovAssistChatScreen } from '@/screens/GovAssistChatScreen';
+import ConversationListScreen from '@/screens/ConversationListScreen';
 
-export default function ChatRoute() {
-  return <GovAssistChatScreen />;
-}
+export default ConversationListScreen;

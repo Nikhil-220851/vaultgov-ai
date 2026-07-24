@@ -13,6 +13,7 @@ from app.services import user_service, document_service
 from app.models.document import Document
 from app.models.scheme import Scheme
 from app.models.user import User
+from app.copilot.eligibility_engine import EligibilityEngine
 
 class DataResolver:
     @staticmethod
@@ -136,3 +137,23 @@ class DataResolver:
             "storage_used_bytes": storage_used_bytes,
             "recent_uploads": recent
         }
+
+    @classmethod
+    def resolve_eligibility(cls, db: Session, firebase_uid: str) -> Dict[str, Any]:
+        """
+        Evaluate all active government schemes against the user's profile and
+        uploaded documents using the deterministic Eligibility Engine.
+
+        Delegates entirely to EligibilityEngine.evaluate_all(), which handles:
+          - User & document lookup
+          - Per-scheme rule evaluation (age, income, gender, location, occupation, education)
+          - Document checklist verification
+          - Confidence scoring
+          - Result grouping (eligible / partially_eligible / not_eligible / insufficient_information)
+          - 5-minute in-memory caching keyed by firebase_uid
+
+        Returns the engine's full grouped payload, or an empty default if the
+        user record does not exist.
+        """
+        result = EligibilityEngine.evaluate_all(db, firebase_uid)
+        return result

@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { Ionicons } from '@expo/vector-icons';
 import { ChatHeader } from '@/components/chat/ChatHeader';
@@ -48,20 +48,185 @@ const QUICK_CHIPS = [
   'Help',
 ];
 
-function getFormattedTime() {
-  return new Date().toLocaleTimeString('en-US', {
+function getFormattedTime(dateObj?: Date) {
+  const d = dateObj || new Date();
+  return d.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
   });
 }
 
+function extractCardDataFromMetadata(intent: string, metadata: any): AICardData | undefined {
+  if (!metadata) return undefined;
+  
+  // 1. Check for document status card
+  if (intent === 'document_status' && metadata.documents && metadata.documents.has_documents) {
+    const doc = metadata.documents.documents[0];
+    if (doc) {
+      const isSuccess = doc.visual_state === 'success';
+      const isWarning = doc.visual_state === 'warning';
+      const isDanger = doc.visual_state === 'danger';
+      const badge = isSuccess ? 'Verified' : isWarning ? 'Needs Attention' : isDanger ? 'Action Required' : 'Uploaded';
+      const badgeColor = isSuccess ? Colors.primaryGreen : isWarning ? Colors.primaryOrange : isDanger ? Colors.dangerRed : Colors.darkGray;
+      
+      return {
+        type: 'document',
+        title: doc.title,
+        subtitle: doc.category || 'Government Document',
+        badge: badge,
+        badgeColor: badgeColor,
+        details: [
+          { label: 'Category', value: doc.category || 'Uncategorised' },
+          { label: 'Expiry Info', value: doc.expiry_text || 'Permanent' },
+        ],
+        primaryActionLabel: (isWarning || isDanger) ? 'Renew Now' : 'Locker Details',
+        iconName: doc.icon_name || 'document-text-outline',
+      };
+    }
+  } 
+  // 2. Check for document reminder card
+  else if (intent === 'document_reminder' && metadata.expiring_documents && metadata.expiring_documents.has_expiring) {
+    const doc = metadata.expiring_documents.documents[0];
+    if (doc) {
+      return {
+        type: 'document',
+        title: doc.title,
+        subtitle: doc.category || 'Government Document',
+        badge: 'Expiring Soon',
+        badgeColor: Colors.primaryOrange,
+        details: [
+          { label: 'Expiry Info', value: doc.expiry_text || 'Expiring' },
+          { label: 'Status', value: 'Needs renewal action' },
+        ],
+        primaryActionLabel: 'Renew Now',
+        secondaryActionLabel: 'Locker Details',
+        iconName: doc.icon_name || 'car-outline',
+      };
+    }
+  } 
+  // 3. Check for active schemes card
+  else if ((intent === 'active_schemes' || intent === 'eligibility') && metadata.schemes && metadata.schemes.has_schemes) {
+    const scheme = metadata.schemes.schemes[0];
+    if (scheme) {
+      return {
+        type: 'scheme',
+        title: scheme.title,
+        subtitle: scheme.ministry || 'Ministry',
+        badge: scheme.status || 'Active',
+        badgeColor: Colors.primaryGreen,
+        details: [
+          { label: 'Category', value: scheme.category || 'General' },
+          { label: 'Application Deadline', value: scheme.applicationEnd || 'Permanent' },
+        ],
+        primaryActionLabel: 'Apply Now',
+        secondaryActionLabel: 'View Details',
+        iconName: 'home-outline',
+      };
+    }
+  } 
+  // 4. Check for profile summary card
+  else if (intent === 'profile_summary' && metadata.profile) {
+    const profile = metadata.profile;
+    if (profile.profile_completed) {
+      return {
+        type: 'health',
+        title: 'Profile Status',
+        subtitle: 'Profile Audit',
+        badge: 'Complete',
+        badgeColor: Colors.primaryGreen,
+        details: [
+          { label: 'Status', value: '100% Completed' },
+        ],
+        primaryActionLabel: 'Explore Schemes',
+        iconName: 'shield-checkmark-outline',
+      };
+    } else if (profile.missing_fields && profile.missing_fields.length > 0) {
+      return {
+        type: 'health',
+        title: 'Profile Incomplete',
+        subtitle: 'Profile Audit',
+        badge: 'Action Required',
+        badgeColor: Colors.primaryOrange,
+        details: [
+          { label: 'Missing Fields', value: profile.missing_fields.join(', ') },
+        ],
+        primaryActionLabel: 'Complete Profile',
+        iconName: 'shield-checkmark-outline',
+      };
+    }
+  } 
+  // 5. Check for application statistics card
+  else if (intent === 'application_statistics' && metadata.statistics) {
+    const stats = metadata.statistics;
+    return {
+      type: 'health',
+      title: 'Document Upload Stats',
+      subtitle: 'Locker Audit',
+      badge: `${stats.total_documents} Docs`,
+      badgeColor: Colors.primaryGreen,
+      details: [
+        { label: 'Total Categories', value: `${stats.total_categories}` },
+        { label: 'Storage Used', value: `${(stats.storage_used_bytes / (1024 * 1024)).toFixed(1)} MB` },
+      ],
+      primaryActionLabel: 'Manage Documents',
+      iconName: 'shield-checkmark-outline',
+    };
+  }
+  return undefined;
+}
+
 export function GovAssistChatScreen() {
   const router = useRouter();
+  const { conversation_id } = useLocalSearchParams();
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(
+    (conversation_id as string) || null
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (conversation_id && conversation_id !== 'null') {
+      loadHistory(conversation_id as string);
+    }
+  }, [conversation_id]);
+
+  const loadHistory = async (id: string) => {
+    setIsLoadingHistory(true);
+    try {
+      const data = await apiClient.getConversationHistory(id);
+      const historyMsgs: Message[] = data.messages.map((m: any) => {
+        let cardData = undefined;
+        if (m.assistant_data) {
+          cardData = extractCardDataFromMetadata(m.assistant_data.intent, m.assistant_data.metadata);
+        }
+        return {
+          id: m.id,
+          sender: m.role as 'user' | 'ai',
+          text: m.content,
+          timestamp: getFormattedTime(new Date(m.created_at)),
+          cardData,
+        };
+      });
+      setMessages(historyMsgs);
+    } catch (e) {
+      console.error('Failed to load history', e);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
   const handleSend = async (textToSend?: string) => {
     if (isTyping) return; // Prevent concurrent requests
@@ -81,123 +246,18 @@ export function GovAssistChatScreen() {
     setInputText('');
     setIsTyping(true);
 
-    try {
-      const response = await apiClient.chatWithCopilot(text);
-      let cardData: AICardData | undefined;
+    abortControllerRef.current = new AbortController();
 
-      // 1. Check for document status card
-      if (response.intent === 'document_status' && response.metadata.documents && response.metadata.documents.has_documents) {
-        const doc = response.metadata.documents.documents[0];
-        if (doc) {
-          const isSuccess = doc.visual_state === 'success';
-          const isWarning = doc.visual_state === 'warning';
-          const isDanger = doc.visual_state === 'danger';
-          const badge = isSuccess ? 'Verified' : isWarning ? 'Needs Attention' : isDanger ? 'Action Required' : 'Uploaded';
-          const badgeColor = isSuccess ? Colors.primaryGreen : isWarning ? Colors.primaryOrange : isDanger ? Colors.dangerRed : Colors.darkGray;
-          
-          cardData = {
-            type: 'document',
-            title: doc.title,
-            subtitle: doc.category || 'Government Document',
-            badge: badge,
-            badgeColor: badgeColor,
-            details: [
-              { label: 'Category', value: doc.category || 'Uncategorised' },
-              { label: 'Expiry Info', value: doc.expiry_text || 'Permanent' },
-            ],
-            primaryActionLabel: (isWarning || isDanger) ? 'Renew Now' : 'Locker Details',
-            iconName: doc.icon_name || 'document-text-outline',
-          };
-        }
-      } 
-      // 2. Check for document reminder card
-      else if (response.intent === 'document_reminder' && response.metadata.expiring_documents && response.metadata.expiring_documents.has_expiring) {
-        const doc = response.metadata.expiring_documents.documents[0];
-        if (doc) {
-          cardData = {
-            type: 'document',
-            title: doc.title,
-            subtitle: doc.category || 'Government Document',
-            badge: 'Expiring Soon',
-            badgeColor: Colors.primaryOrange,
-            details: [
-              { label: 'Expiry Info', value: doc.expiry_text || 'Expiring' },
-              { label: 'Status', value: 'Needs renewal action' },
-            ],
-            primaryActionLabel: 'Renew Now',
-            secondaryActionLabel: 'Locker Details',
-            iconName: doc.icon_name || 'car-outline',
-          };
-        }
-      } 
-      // 3. Check for active schemes card
-      else if ((response.intent === 'active_schemes' || response.intent === 'eligibility') && response.metadata.schemes && response.metadata.schemes.has_schemes) {
-        const scheme = response.metadata.schemes.schemes[0];
-        if (scheme) {
-          cardData = {
-            type: 'scheme',
-            title: scheme.title,
-            subtitle: scheme.ministry || 'Ministry',
-            badge: scheme.status || 'Active',
-            badgeColor: Colors.primaryGreen,
-            details: [
-              { label: 'Category', value: scheme.category || 'General' },
-              { label: 'Application Deadline', value: scheme.applicationEnd || 'Permanent' },
-            ],
-            primaryActionLabel: 'Apply Now',
-            secondaryActionLabel: 'View Details',
-            iconName: 'home-outline',
-          };
-        }
-      } 
-      // 4. Check for profile summary card
-      else if (response.intent === 'profile_summary' && response.metadata.profile) {
-        const profile = response.metadata.profile;
-        if (profile.profile_completed) {
-          cardData = {
-            type: 'health',
-            title: 'Profile Status',
-            subtitle: 'Profile Audit',
-            badge: 'Complete',
-            badgeColor: Colors.primaryGreen,
-            details: [
-              { label: 'Status', value: '100% Completed' },
-            ],
-            primaryActionLabel: 'Explore Schemes',
-            iconName: 'shield-checkmark-outline',
-          };
-        } else if (profile.missing_fields && profile.missing_fields.length > 0) {
-          cardData = {
-            type: 'health',
-            title: 'Profile Incomplete',
-            subtitle: 'Profile Audit',
-            badge: 'Action Required',
-            badgeColor: Colors.primaryOrange,
-            details: [
-              { label: 'Missing Fields', value: profile.missing_fields.join(', ') },
-            ],
-            primaryActionLabel: 'Complete Profile',
-            iconName: 'shield-checkmark-outline',
-          };
-        }
-      } 
-      // 5. Check for application statistics card
-      else if (response.intent === 'application_statistics' && response.metadata.statistics) {
-        const stats = response.metadata.statistics;
-        cardData = {
-          type: 'health',
-          title: 'Document Upload Stats',
-          subtitle: 'Locker Audit',
-          badge: `${stats.total_documents} Docs`,
-          badgeColor: Colors.primaryGreen,
-          details: [
-            { label: 'Total Categories', value: `${stats.total_categories}` },
-            { label: 'Storage Used', value: `${(stats.storage_used_bytes / (1024 * 1024)).toFixed(1)} MB` },
-          ],
-          primaryActionLabel: 'Manage Documents',
-          iconName: 'shield-checkmark-outline',
-        };
+    try {
+      const response = await apiClient.chatWithCopilot(text, currentConversationId || undefined, abortControllerRef.current.signal);
+      
+      if (response.metadata && response.metadata.conversation_id) {
+        setCurrentConversationId(response.metadata.conversation_id);
       }
+      
+      let cardData = extractCardDataFromMetadata(response.intent, response.metadata);
+
+      // The card parsing logic is now in extractCardDataFromMetadata
 
       const aiMsgId = `ai-${Date.now()}-${Math.random()}`;
       const aiMsg: Message = {
@@ -215,7 +275,11 @@ export function GovAssistChatScreen() {
       console.log("Card Data:", cardData);
 
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError' || (err.message && err.message.includes('abort'))) {
+        console.log('[GovAssistChatScreen] Request was aborted');
+        return;
+      }
       console.error('[GovAssistChatScreen] Failed to get response from copilot:', err);
       const errorMsgId = `error-${Date.now()}-${Math.random()}`;
       const errorMsg: Message = {
@@ -307,6 +371,8 @@ export function GovAssistChatScreen() {
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.messageList}
               showsVerticalScrollIndicator={false}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
               renderItem={({ item }) => (
                 <View>
                   <MessageBubble sender={item.sender} text={item.text} timestamp={item.timestamp} />
@@ -335,7 +401,12 @@ export function GovAssistChatScreen() {
           </View>
 
           {/* Chat Input */}
-          <ChatInput value={inputText} onChangeText={setInputText} onSend={() => handleSend()} />
+          <ChatInput 
+            value={inputText} 
+            onChangeText={setInputText} 
+            onSend={() => handleSend()} 
+            isLoading={isTyping} 
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
