@@ -28,6 +28,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.models.scheme import Scheme, generate_content_hash
+from app.services.notification_engine import notification_engine
 
 
 # ─── Repository ───────────────────────────────────────────────────────────────
@@ -216,7 +217,14 @@ class SchemeSyncService:
         archived = self.repository.archive_expired(now)
         self.db.commit()
 
-        # Step 2: (Future) Process payloads from official data feeds.
+        # Step 2: Generate Smart Vault Notifications
+        try:
+            print("[SchemeSyncService] Running Expiry Notification Engine...")
+            notification_engine.generate_expiry_notifications(self.db)
+        except Exception as e:
+            print(f"[SchemeSyncService] Failed to generate expiry notifications: {e}")
+
+        # Step 3: (Future) Process payloads from official data feeds.
         # When official APIs become available, parse and upsert here.
         # raw_payload = official_source_client.fetch()
         # valid_records = self.parser.parse(raw_payload)

@@ -1,7 +1,15 @@
 {
+  "template_id": "pan",
   "document_type": "pan",
   "display_name": "PAN Card",
+  "category": "Identity",
   "description": "Permanent Account Number card issued by the Income Tax Department of India.",
+  "document_aliases": [
+    "permanent account number",
+    "income tax department",
+    "pan card",
+    "tax deductor"
+  ],
   "required_fields": [
     "pan_number",
     "full_name",
@@ -19,11 +27,43 @@
     "date_of_birth": "Format DD/MM/YYYY as printed on the card.",
     "issue_date": "Date of issue if visible on the card."
   },
+  "field_types": {
+    "pan_number": "pan",
+    "date_of_birth": "date",
+    "issue_date": "date"
+  },
+  "validation_hints": {
+    "pan_number": "10 characters exactly (5 letters, 4 digits, 1 letter).",
+    "date_of_birth": "Format DD/MM/YYYY.",
+    "father_name": "May start with S/O (Son of), D/O (Daughter of), F/O (Father of).",
+    "issue_date": "Format DD/MM/YYYY."
+  },
   "aliases": {
-    "pan_number": ["pan", "permanent account number", "pan no", "pan card number", "account no"],
-    "full_name": ["name", "account holder name", "taxpayer name"],
-    "father_name": ["father's name", "father name", "f/o", "s/o", "d/o"],
-    "date_of_birth": ["dob", "date of birth", "birth date", "born"]
+    "pan_number": [
+      "pan",
+      "permanent account number",
+      "pan no",
+      "pan card number",
+      "account no"
+    ],
+    "full_name": [
+      "name",
+      "account holder name",
+      "taxpayer name"
+    ],
+    "father_name": [
+      "father's name",
+      "father name",
+      "f/o",
+      "s/o",
+      "d/o"
+    ],
+    "date_of_birth": [
+      "dob",
+      "date of birth",
+      "birth date",
+      "born"
+    ]
   },
   "output_field_names": {
     "pan_number": "pan_number",
@@ -32,9 +72,7 @@
     "date_of_birth": "date_of_birth",
     "issue_date": "issue_date"
   },
-  "validation_hints": {
-    "pan_number": "Exactly 10 characters. Pattern: [A-Z]{5}[0-9]{4}[A-Z]{1}. Example: ABCDE1234F.",
-    "date_of_birth": "Expected format DD/MM/YYYY. Year must be plausible (1900–present).",
-    "father_name": "May start with S/O (Son of), D/O (Daughter of), F/O (Father of)."
-  }
+  "extraction_notes": "",
+  "supports_expiry": false,
+  "supports_notifications": false
 }

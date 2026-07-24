@@ -1,7 +1,16 @@
 {
+  "template_id": "driving_license",
   "document_type": "driving_license",
   "display_name": "Driving License",
+  "category": "Identity",
   "description": "Indian Driving License issued by State Transport Authorities under the Motor Vehicles Act.",
+  "document_aliases": [
+    "driving licence",
+    "driving license",
+    "dl no",
+    "union of india",
+    "transport department"
+  ],
   "required_fields": [
     "dl_number",
     "full_name",
@@ -22,7 +31,7 @@
     "photo_url"
   ],
   "field_hints": {
-    "dl_number": "License number format: <STATE-CODE><RTO-CODE><YEAR><SEQUENCE>, e.g. MH0120190123456. Exactly 15–16 alphanumeric characters.",
+    "dl_number": "License number format: <STATE-CODE><RTO-CODE><YEAR><SEQUENCE>, e.g. MH0120190123456. Exactly 15\u00e2\u20ac\u201c16 alphanumeric characters.",
     "full_name": "Full name of the license holder as printed on the card.",
     "date_of_birth": "Format DD/MM/YYYY as printed on the license.",
     "address": "Permanent residential address as printed. May span multiple lines.",
@@ -37,17 +46,80 @@
     "hazardous_valid_till": "Validity date for hazardous goods authorization if present.",
     "hill_valid_till": "Validity date for hill driving authorization if present."
   },
+  "field_types": {
+    "date_of_birth": "date",
+    "issue_date": "date",
+    "expiry_date": "date"
+  },
+  "validation_hints": {
+    "dl_number": "Starts with 2-letter state code (e.g. MH, DL, TN). Total 15\u00e2\u20ac\u201c16 characters, alphanumeric only.",
+    "date_of_birth": "Format DD/MM/YYYY. Age should be >= 16 years.",
+    "issue_date": "Format DD/MM/YYYY.",
+    "expiry_date": "Format DD/MM/YYYY.",
+    "blood_group": "One of: A+, A-, B+, B-, AB+, AB-, O+, O-.",
+    "vehicle_classes": "Each code should be one of the standard Indian vehicle class codes: MC, MCWG, LMV, LMV-NT, TRANS, HMV, HGV, MGV, etc."
+  },
   "aliases": {
-    "dl_number": ["driving licence no", "dl no", "licence number", "license no", "driving license number", "dl"],
-    "full_name": ["name", "holder name", "licensee name"],
-    "date_of_birth": ["dob", "date of birth", "birth date"],
-    "address": ["addr", "residential address", "permanent address"],
-    "issue_date": ["date of issue", "issued on", "doi"],
-    "expiry_date": ["date of expiry", "valid till", "validity", "expire date", "doe"],
-    "vehicle_classes": ["cov", "class of vehicle", "vehicle category", "authorised vehicles"],
-    "blood_group": ["bg", "blood type", "blood grp"],
-    "father_or_husband_name": ["f/o", "h/o", "father name", "husband name", "s/o", "d/o"],
-    "issuing_authority": ["issued by", "rto", "licensing authority", "office"]
+    "dl_number": [
+      "driving licence no",
+      "dl no",
+      "licence number",
+      "license no",
+      "driving license number",
+      "dl"
+    ],
+    "full_name": [
+      "name",
+      "holder name",
+      "licensee name"
+    ],
+    "date_of_birth": [
+      "dob",
+      "date of birth",
+      "birth date"
+    ],
+    "address": [
+      "addr",
+      "residential address",
+      "permanent address"
+    ],
+    "issue_date": [
+      "date of issue",
+      "issued on",
+      "doi"
+    ],
+    "expiry_date": [
+      "date of expiry",
+      "valid till",
+      "validity",
+      "expire date",
+      "doe"
+    ],
+    "vehicle_classes": [
+      "cov",
+      "class of vehicle",
+      "vehicle category",
+      "authorised vehicles"
+    ],
+    "blood_group": [
+      "bg",
+      "blood type",
+      "blood grp"
+    ],
+    "father_or_husband_name": [
+      "f/o",
+      "h/o",
+      "father name",
+      "husband name",
+      "s/o",
+      "d/o"
+    ],
+    "issuing_authority": [
+      "issued by",
+      "rto",
+      "licensing authority",
+      "office"
+    ]
   },
   "output_field_names": {
     "dl_number": "dl_number",
@@ -65,12 +137,7 @@
     "hazardous_valid_till": "hazardous_valid_till",
     "hill_valid_till": "hill_valid_till"
   },
-  "validation_hints": {
-    "dl_number": "Starts with 2-letter state code (e.g. MH, DL, TN). Total 15–16 characters, alphanumeric only.",
-    "date_of_birth": "Format DD/MM/YYYY. Age should be >= 16 years.",
-    "issue_date": "Format DD/MM/YYYY. Must be on or before expiry_date.",
-    "expiry_date": "Format DD/MM/YYYY. Typically 20 years after issue_date for non-transport.",
-    "blood_group": "One of: A+, A-, B+, B-, AB+, AB-, O+, O-.",
-    "vehicle_classes": "Each code should be one of the standard Indian vehicle class codes: MC, MCWG, LMV, LMV-NT, TRANS, HMV, HGV, MGV, etc."
-  }
+  "extraction_notes": "",
+  "supports_expiry": true,
+  "supports_notifications": true
 }

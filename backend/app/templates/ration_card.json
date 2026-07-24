@@ -1,0 +1,52 @@
+{
+  "template_id": "ration_card",
+  "document_type": "ration_card",
+  "display_name": "Ration Card",
+  "category": "Family",
+  "description": "State issued Ration Card.",
+  "document_aliases": [
+    "ration card",
+    "public distribution",
+    "department of food",
+    "food and civil supplies"
+  ],
+  "required_fields": [
+    "ration_card_number",
+    "head_of_family",
+    "card_type",
+    "address"
+  ],
+  "optional_fields": [
+    "fps_number",
+    "number_of_members",
+    "issue_date",
+    "issuing_authority"
+  ],
+  "field_hints": {
+    "ration_card_number": "Usually 10 to 15 digits.",
+    "head_of_family": "Name of the family head.",
+    "card_type": "BPL, APL, AAY, etc.",
+    "fps_number": "Fair Price Shop ID or Number."
+  },
+  "field_types": {
+    "issue_date": "date"
+  },
+  "validation_hints": {
+    "number_of_members": "Numeric.",
+    "issue_date": "Format DD/MM/YYYY."
+  },
+  "aliases": {},
+  "output_field_names": {
+    "ration_card_number": "ration_card_number",
+    "head_of_family": "head_of_family",
+    "card_type": "card_type",
+    "address": "address",
+    "fps_number": "fps_number",
+    "number_of_members": "number_of_members",
+    "issue_date": "issue_date",
+    "issuing_authority": "issuing_authority"
+  },
+  "extraction_notes": "",
+  "supports_expiry": false,
+  "supports_notifications": false
+}

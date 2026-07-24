@@ -166,19 +166,17 @@ async def upload_image(file: UploadFile = File(...)):
         return _build_response(res, ocr_text, doc_type, structured_data, document_intelligence_success)
 
     # ── Step 3c: Template detection ────────────────────────────────────────────
-    print("Running template detector...")
-    text_lower = ocr_text.lower()
-    if "aadhaar" in text_lower or "uidai" in text_lower:
-        doc_type = "aadhaar"
-    elif "permanent account number" in text_lower or "income tax department" in text_lower:
-        doc_type = "pan"
-    elif "passport" in text_lower:
-        doc_type = "passport"
-    elif "driving licence" in text_lower or "driving license" in text_lower or "dl no" in text_lower:
-        doc_type = "driving_license"
+    print("Running TemplateMatcher...")
+    from app.services.document_intelligence.template_matcher import TemplateMatcher
+    
+    matcher = TemplateMatcher()
+    match_result = matcher.match(ocr_text)
+    doc_type = match_result["template_id"]
+    display_name = match_result["display_name"]
+    category = match_result["category"]
 
     if doc_type != "unknown":
-        print(f"Detected template:\n{doc_type}\nBuilding prompt...\nCalling Gemini...")
+        print(f"Detected template:\n{doc_type} (Score: {match_result['confidence_score']}%)\nBuilding prompt...\nCalling Gemini...")
     else:
         print("No template matched\nUsing generic Gemini extraction\nCalling Gemini...")
 
@@ -240,35 +238,24 @@ Schema:
     print("=======================================")
 
     processing_time = time.time() - t_start_total
-    return _build_response(res, ocr_text, doc_type, structured_data, document_intelligence_success, processing_time)
+    return _build_response(res, ocr_text, doc_type, display_name, category, structured_data, document_intelligence_success, processing_time)
 
 
 def _build_response(
     cloudinary_res: dict,
     ocr_text: str,
     doc_type: str,
+    display_name: str,
+    category: str,
     structured_data,
     document_intelligence_success: bool,
     processing_time: float = 0.0,
 ) -> dict:
-    display_names = {
-        "aadhaar": "Aadhaar Card",
-        "pan": "PAN Card",
-        "passport": "Passport",
-        "driving_license": "Driving Licence",
-        "unknown": "Unknown Document",
-    }
-    categories = {
-        "aadhaar": "Identity",
-        "pan": "Identity",
-        "passport": "Identity",
-        "driving_license": "Identity",
-        "unknown": "Other",
-    }
-    
     # Format structured fields to flat key: value if structured_data is present
     flat_structured = {}
     confidence = 0.0
+    validation_result = None
+
     if structured_data and isinstance(structured_data, dict):
         conf_scores = []
         for k, v in structured_data.items():
@@ -287,6 +274,25 @@ def _build_response(
             confidence = sum(conf_scores) / len(conf_scores)
         else:
             confidence = 0.9 if document_intelligence_success else 0.0
+            
+        # Run ValidationEngine
+        try:
+            from app.services.document_intelligence.template_loader import TemplateLoader
+            from app.services.document_intelligence.validation_engine import ValidationEngine
+            
+            loader = TemplateLoader()
+            template = loader.load(doc_type)
+            validator = ValidationEngine()
+            
+            val_result = validator.validate(template, structured_data)
+            validation_result = val_result.to_dict()
+        except Exception as e:
+            print(f"Validation Engine failed: {e}")
+            validation_result = {
+                "score": 0.0,
+                "overall_status": "Error",
+                "field_results": {}
+            }
 
     return {
         "secure_url": cloudinary_res.get("secure_url"),
@@ -294,12 +300,13 @@ def _build_response(
         "width": cloudinary_res.get("width"),
         "height": cloudinary_res.get("height"),
         "document_type": doc_type,
-        "display_name": display_names.get(doc_type, "Unknown Document"),
-        "category": categories.get(doc_type, "Other"),
+        "display_name": display_name,
+        "category": category,
         "confidence": confidence,
         "extracted_text": ocr_text,
         "ocr_text": ocr_text,
-        "structured_data": flat_structured,
+        "structured_data": flat_structured if flat_structured else None,
+        "validation": validation_result,
         "document_intelligence_success": document_intelligence_success,
-        "processing_time": round(processing_time, 2),
+        "processing_time_seconds": round(processing_time, 2),
     }

@@ -1,0 +1,60 @@
+{
+  "template_id": "caste_certificate",
+  "document_type": "caste_certificate",
+  "display_name": "Caste Certificate",
+  "category": "Certificates",
+  "description": "SC/ST/OBC Caste Certificate.",
+  "document_aliases": [
+    "caste certificate",
+    "scheduled caste",
+    "backward class",
+    "scheduled tribe"
+  ],
+  "required_fields": [
+    "certificate_number",
+    "applicant_name",
+    "father_name",
+    "caste",
+    "category_type",
+    "issue_date"
+  ],
+  "optional_fields": [
+    "issuing_authority",
+    "address",
+    "sub_caste"
+  ],
+  "field_hints": {
+    "certificate_number": "Unique certificate number.",
+    "caste": "Name of the caste/tribe.",
+    "category_type": "SC, ST, or OBC.",
+    "issue_date": "Date of issue.",
+    "sub_caste": "Sub-caste if mentioned."
+  },
+  "field_types": {
+    "certificate_number": "registration_number",
+    "issue_date": "date"
+  },
+  "validation_hints": {
+    "issue_date": "Format DD/MM/YYYY.",
+    "certificate_number": "Official format."
+  },
+  "aliases": {
+    "category_type": [
+      "category"
+    ]
+  },
+  "output_field_names": {
+    "certificate_number": "certificate_number",
+    "applicant_name": "applicant_name",
+    "father_name": "father_name",
+    "caste": "caste",
+    "category_type": "category_type",
+    "issue_date": "issue_date",
+    "issuing_authority": "issuing_authority",
+    "address": "address",
+    "sub_caste": "sub_caste"
+  },
+  "extraction_notes": "State specific formats.",
+  "supports_expiry": false,
+  "supports_notifications": false
+}

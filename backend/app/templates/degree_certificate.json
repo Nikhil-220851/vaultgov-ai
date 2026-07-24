@@ -1,0 +1,50 @@
+{
+  "template_id": "degree_certificate",
+  "document_type": "degree_certificate",
+  "display_name": "Degree Certificate",
+  "category": "Education",
+  "description": "University Degree Certificate.",
+  "document_aliases": [
+    "degree",
+    "university",
+    "bachelor",
+    "master",
+    "convocation"
+  ],
+  "required_fields": [
+    "registration_or_roll_number",
+    "student_name",
+    "university_name",
+    "degree_name",
+    "passing_year",
+    "classification_or_division"
+  ],
+  "optional_fields": [
+    "issue_date",
+    "college_name"
+  ],
+  "field_hints": {
+    "classification_or_division": "E.g., First Class, Second Class, Distinction."
+  },
+  "field_types": {
+    "issue_date": "date"
+  },
+  "validation_hints": {
+    "passing_year": "Format YYYY.",
+    "issue_date": "Format DD/MM/YYYY."
+  },
+  "aliases": {},
+  "output_field_names": {
+    "registration_or_roll_number": "registration_or_roll_number",
+    "student_name": "student_name",
+    "university_name": "university_name",
+    "degree_name": "degree_name",
+    "passing_year": "passing_year",
+    "classification_or_division": "classification_or_division",
+    "issue_date": "issue_date",
+    "college_name": "college_name"
+  },
+  "extraction_notes": "",
+  "supports_expiry": false,
+  "supports_notifications": false
+}

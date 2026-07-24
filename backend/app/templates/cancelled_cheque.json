@@ -1,0 +1,52 @@
+{
+  "template_id": "cancelled_cheque",
+  "document_type": "cancelled_cheque",
+  "display_name": "Cancelled Cheque",
+  "category": "Financial",
+  "description": "A cheque leaf with CANCELLED written over it.",
+  "document_aliases": [
+    "cancelled",
+    "cheque",
+    "check",
+    "pay to"
+  ],
+  "required_fields": [
+    "account_number",
+    "ifsc_code",
+    "account_holder_name",
+    "bank_name",
+    "cheque_number"
+  ],
+  "optional_fields": [
+    "branch_name",
+    "micr_code",
+    "cheque_date"
+  ],
+  "field_hints": {
+    "cheque_number": "6-digit number usually at the bottom left."
+  },
+  "field_types": {
+    "account_number": "account_number",
+    "ifsc_code": "ifsc",
+    "cheque_number": "cheque_number",
+    "cheque_date": "date"
+  },
+  "validation_hints": {
+    "ifsc_code": "11 characters exactly.",
+    "cheque_number": "Exactly 6 digits."
+  },
+  "aliases": {},
+  "output_field_names": {
+    "account_number": "account_number",
+    "ifsc_code": "ifsc_code",
+    "account_holder_name": "account_holder_name",
+    "bank_name": "bank_name",
+    "cheque_number": "cheque_number",
+    "branch_name": "branch_name",
+    "micr_code": "micr_code",
+    "cheque_date": "cheque_date"
+  },
+  "extraction_notes": "",
+  "supports_expiry": false,
+  "supports_notifications": false
+}

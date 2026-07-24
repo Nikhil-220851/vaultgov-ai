@@ -1,0 +1,17 @@
+{
+  "scheme_id": "ayushman_bharat",
+  "display_name": "Ayushman Bharat PM-JAY",
+  "description": "Health insurance cover of ₹5 lakh per family per year for secondary and tertiary hospitalisation.",
+  "category": "Health",
+  "priority": 1,
+  "required_documents": [
+    "aadhaar",
+    "ration_card"
+  ],
+  "optional_documents": [
+    "income_certificate",
+    "caste_certificate"
+  ],
+  "eligibility_notes": "Families listed in the SECC 2011 database. Primarily targets Below Poverty Line (BPL) households.",
+  "official_link": "https://pmjay.gov.in"
+}

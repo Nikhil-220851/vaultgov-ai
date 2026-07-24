@@ -1,0 +1,18 @@
+{
+  "scheme_id": "pm_kisan",
+  "display_name": "PM Kisan Samman Nidhi",
+  "description": "₹6,000/year direct income support to small and marginal farmer families.",
+  "category": "Agriculture",
+  "priority": 1,
+  "required_documents": [
+    "aadhaar",
+    "bank_passbook",
+    "income_certificate",
+    "land_record"
+  ],
+  "optional_documents": [
+    "ration_card"
+  ],
+  "eligibility_notes": "Must be a small/marginal farmer with cultivable land. Family income should be below the specified threshold.",
+  "official_link": "https://pmkisan.gov.in"
+}

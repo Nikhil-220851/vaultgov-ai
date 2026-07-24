@@ -47,8 +47,17 @@ class DocumentTemplate(BaseModel):
     """
 
     document_type: str = Field(..., description="Canonical identifier, e.g. 'aadhaar'.")
+    template_id: str = Field(default="", description="Unique template identifier.")
+    category: str = Field(default="Other", description="Document category (Identity, Certificates, Family, Financial, Education).")
     display_name: str = Field(..., description="Human-readable name, e.g. 'Aadhaar Card'.")
     description: str = Field(default="", description="One-sentence description of the document.")
+    document_aliases: List[str] = Field(
+        default_factory=list,
+        description="Keywords used by TemplateMatcher to detect this document type in OCR text.",
+    )
+    extraction_notes: str = Field(default="", description="Notes for developers about extraction quirks.")
+    supports_expiry: bool = Field(default=False, description="Whether this document has an expiry date.")
+    supports_notifications: bool = Field(default=False, description="Whether to send expiry notifications.")
     required_fields: List[str] = Field(
         default_factory=list,
         description="Fields the LLM must always attempt to extract.",
@@ -60,6 +69,10 @@ class DocumentTemplate(BaseModel):
     field_hints: Dict[str, str] = Field(
         default_factory=dict,
         description="Per-field textual hints given to the LLM.",
+    )
+    field_types: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Maps field names to validation types (e.g., 'aadhaar', 'date').",
     )
     aliases: Dict[str, List[str]] = Field(
         default_factory=dict,

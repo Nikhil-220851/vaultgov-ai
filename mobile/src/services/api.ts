@@ -92,13 +92,49 @@ export interface DocumentCreatePayload {
   image_uri?: string | null;
   source?: string;
   confidence_score?: number | null;
+  supports_expiry?: boolean;
 }
 
 export interface VaultGovStats {
   total_documents: number;
-  total_categories: number;
-  storage_used_bytes: number;
+  active_documents: number;
+  expired_documents: number;
+  expiring_soon: number;
+  documents_without_expiry: number;
+  average_health_score: number;
+  category_breakdown: Record<string, number>;
+  expiry_timeline: any[];
   recent_uploads: VaultGovDocument[];
+  total_categories?: number; // kept for backwards compatibility
+}
+
+// Phase 6: Smart Scheme Intelligence Engine
+export interface SchemeRecommendation {
+  scheme_id: string;
+  scheme_name: string;
+  category: string;
+  priority: number;
+  description: string;
+  official_link: string;
+  eligibility_notes: string;
+  status: 'Eligible' | 'Partially Eligible' | 'Not Eligible';
+  health_score: number;
+  matched_documents: string[];
+  missing_documents: string[];
+  expired_documents: string[];
+  expiring_soon_documents: string[];
+  required_count: number;
+  matched_count: number;
+  completion_pct: number;
+}
+
+export interface RecommendationsSummary {
+  total_schemes: number;
+  eligible: number;
+  partially_eligible: number;
+  not_eligible: number;
+  top_eligible: string[];
+  top_missing: string[];
 }
 
 // ─── Internal state ───────────────────────────────────────────────────────────
@@ -325,7 +361,7 @@ export const apiClient = {
   },
 
   async getStats(): Promise<VaultGovStats> {
-    return fetchWithRetry<VaultGovStats>(`${API_BASE_URL}/api/v1/stats/`, {
+    return fetchWithRetry<VaultGovStats>(`${API_BASE_URL}/api/v1/dashboard/summary`, {
       method: 'GET',
       headers: getHeaders(),
     });
@@ -344,6 +380,7 @@ export const apiClient = {
     extracted_text?: string;
     ocr_text?: string;
     structured_data?: Record<string, any> | null;
+    validation?: any;
     document_intelligence_success?: boolean;
     processing_time?: number;
   }> {
@@ -400,6 +437,7 @@ export const apiClient = {
       extracted_text?: string;
       ocr_text?: string;
       structured_data?: Record<string, any> | null;
+      validation?: any;
       document_intelligence_success?: boolean;
       processing_time?: number;
     }>(
@@ -425,6 +463,7 @@ export const apiClient = {
     extracted_text?: string;
     ocr_text?: string;
     structured_data?: Record<string, any> | null;
+    validation?: any;
     document_intelligence_success?: boolean;
     processing_time?: number;
     // PDF-specific metadata
@@ -457,6 +496,7 @@ export const apiClient = {
       extracted_text?: string;
       ocr_text?: string;
       structured_data?: Record<string, any> | null;
+      validation?: any;
       document_intelligence_success?: boolean;
       processing_time?: number;
       metadata?: { filename?: string; content_type?: string; size?: number };
@@ -499,5 +539,18 @@ export const apiClient = {
   async getSchemeById(schemeId: string): Promise<any> {
     const url = `${API_BASE_URL}/api/v1/schemes/${encodeURIComponent(schemeId)}`;
     return fetchWithRetry(url, { method: 'GET', headers: getHeaders() });
+  },
+
+  // Phase 6: Smart Scheme Intelligence Engine
+  async getSchemeRecommendations(category?: string): Promise<SchemeRecommendation[]> {
+    const url = category
+      ? `${API_BASE_URL}/api/v1/schemes/recommendations?category=${encodeURIComponent(category)}`
+      : `${API_BASE_URL}/api/v1/schemes/recommendations`;
+    return fetchWithRetry<SchemeRecommendation[]>(url, { method: 'GET', headers: getHeaders() });
+  },
+
+  async getRecommendationsSummary(): Promise<RecommendationsSummary> {
+    const url = `${API_BASE_URL}/api/v1/schemes/recommendations/summary`;
+    return fetchWithRetry<RecommendationsSummary>(url, { method: 'GET', headers: getHeaders() });
   },
 };

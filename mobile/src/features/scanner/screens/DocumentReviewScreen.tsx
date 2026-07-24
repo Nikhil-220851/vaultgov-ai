@@ -11,7 +11,7 @@
  *  - Direct DB Save via POST /documents (<1s target, NO Gemini call)
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as crypto from 'expo-crypto';
 import { Colors, Spacing, Typography, Radius } from '@/theme';
-import { ReviewModel, DocumentCategory } from '../types/review.types';
+import {
+  ReviewModel,
+  DocumentCategory,
+  ValidationResult,
+  FieldValidationResult,
+} from '../types/review.types';
 import { useDocumentStore } from '@/features/documents/store/useDocumentStore';
 import { apiClient } from '@/services/api';
 import { auth } from '@/services/firebase';
@@ -74,12 +79,47 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
   const isSavingRef = useRef(false);
   const [saveButtonScale] = useState(() => new Animated.Value(1));
 
+  // ── Validation State ──────────────────────────────────────────────────
+  const [validation, setValidation] = useState<ValidationResult | undefined>(
+    reviewModel.validation
+  );
+  const [isValidating, setIsValidating] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const requiredFieldsFromValidation = validation
+    ? Object.entries(validation.field_results)
+        .filter(([, r]) => r.status === 'Invalid' && !!(reviewModel.structuredFields ?? {}))
+        .map(([k]) => k)
+    : [];
+
+  const runValidation = useCallback(
+    async (currentFields: Record<string, string | null>) => {
+      if (!reviewModel.documentType || reviewModel.documentType === 'unknown') return;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(async () => {
+        try {
+          setIsValidating(true);
+          const result = await apiClient.post('/documents/validate', {
+            document_type: reviewModel.documentType,
+            fields: currentFields,
+          });
+          setValidation(result as ValidationResult);
+        } catch (e) {
+          // Validation errors are non-critical; swallow silently
+        } finally {
+          setIsValidating(false);
+        }
+      }, 600);
+    },
+    [reviewModel.documentType]
+  );
+
   const handleFieldChange = (key: string, val: string) => {
-    setFields((prev) => ({
-      ...prev,
-      [key]: val,
-    }));
+    const updated = { ...fields, [key]: val };
+    setFields(updated);
+    runValidation(updated);
   };
+
 
   const CategoryChip: React.FC<{ item: (typeof CATEGORIES)[number] }> = ({ item }) => {
     const isSelected = category === item.label;
@@ -125,6 +165,44 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
     if (!trimmedTitle) {
       Alert.alert('Missing title', 'Please enter a document title before saving.');
       return;
+    }
+
+    // ── Validation Gate (Phase 4.1) ───────────────────────────────────────────
+    if (validation) {
+      const requiredFields = new Set(validation.required_fields ?? []);
+
+      // Required fields that are Invalid → hard block
+      const invalidRequiredKeys = Object.entries(validation.field_results)
+        .filter(([key, result]) => result.status === 'Invalid' && requiredFields.has(key))
+        .map(([key]) => key);
+
+      if (invalidRequiredKeys.length > 0) {
+        Alert.alert(
+          'Cannot Save',
+          'Please correct all required fields before saving.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Optional fields that are Invalid → soft warning (user may proceed)
+      const invalidOptionalKeys = Object.entries(validation.field_results)
+        .filter(([key, result]) => result.status === 'Invalid' && !requiredFields.has(key))
+        .map(([key]) => key);
+
+      if (invalidOptionalKeys.length > 0) {
+        const shouldContinue = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Validation Warnings',
+            'This document contains some optional fields that appear to be invalid. You can still save it and edit it later.',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Save Anyway', onPress: () => resolve(true) },
+            ]
+          );
+        });
+        if (!shouldContinue) return;
+      }
     }
 
     isSavingRef.current = true;
@@ -178,6 +256,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         extracted_text: fullExtractedText,
         tags,
         confidence_score: reviewModel.confidence || 0.9,
+        supports_expiry: validation?.supports_expiry ?? false,
       });
 
       setSaveStatus('Done.');
@@ -204,6 +283,49 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
   const confidencePct = Math.round((reviewModel.confidence || 0) * 100);
   const confidenceColor =
     confidencePct >= 80 ? '#16A34A' : confidencePct >= 50 ? '#CA8A04' : '#DC2626';
+
+  const validationScore = validation?.score ?? null;
+  const validationColor =
+    validationScore === null
+      ? Colors.darkGray
+      : validationScore >= 80
+      ? '#16A34A'
+      : validationScore >= 50
+      ? '#CA8A04'
+      : '#DC2626';
+
+  /** Render per-field validation indicator below each TextInput */
+  const renderFieldValidation = (key: string) => {
+    const fieldResult: FieldValidationResult | undefined = validation?.field_results?.[key];
+    if (!fieldResult || fieldResult.status === 'Valid') return null;
+
+    const isInvalid = fieldResult.status === 'Invalid';
+    const color = isInvalid ? '#DC2626' : '#CA8A04';
+    const icon = isInvalid ? 'close-circle-outline' : 'warning-outline';
+    const prefix = isInvalid ? '✗' : '⚠';
+
+    return (
+      <View style={styles.fieldValidationRow}>
+        <Ionicons name={icon as any} size={12} color={color} />
+        <Text style={[styles.fieldValidationText, { color }]}>
+          {prefix} {fieldResult.reason || (isInvalid ? 'Invalid value' : 'Check this field')}
+        </Text>
+      </View>
+    );
+  };
+
+  /** Render a green ✓ for valid fields */
+  const renderFieldValidIcon = (key: string) => {
+    const fieldResult: FieldValidationResult | undefined = validation?.field_results?.[key];
+    if (!fieldResult || fieldResult.status !== 'Valid') return null;
+    return (
+      <View style={styles.fieldValidationRow}>
+        <Ionicons name="checkmark-circle-outline" size={12} color="#16A34A" />
+        <Text style={[styles.fieldValidationText, { color: '#16A34A' }]}>✓ Valid</Text>
+      </View>
+    );
+  };
+
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -266,6 +388,18 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
               <Text style={styles.badgeText}>{reviewModel.processingTime.toFixed(1)}s</Text>
             </View>
           ) : null}
+          {validationScore !== null && (
+            <View style={[styles.badge, { borderColor: validationColor }]}>
+              {isValidating ? (
+                <ActivityIndicator size="small" color={validationColor} />
+              ) : (
+                <Ionicons name="shield-checkmark-outline" size={13} color={validationColor} />
+              )}
+              <Text style={[styles.badgeText, { color: validationColor }]}>
+                {isValidating ? 'Validating…' : `${Math.round(validationScore)}% valid`}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Title Input */}
@@ -298,19 +432,32 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         {entries.length > 0 && (
           <View style={styles.section}>
             <SectionHeader title="Extracted Information" icon="sparkles-outline" />
-            {entries.map(([key, val]) => (
-              <View key={key} style={styles.fieldRow}>
-                <Text style={styles.fieldLabel}>{key}</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  value={val || ''}
-                  onChangeText={(newVal) => handleFieldChange(key, newVal)}
-                  placeholder={`Enter ${key}`}
-                  placeholderTextColor="#AAAAAA"
-                  editable={!isSaving}
-                />
-              </View>
-            ))}
+            {entries.map(([key, val]) => {
+              const fieldResult = validation?.field_results?.[key];
+              const isInvalid = fieldResult?.status === 'Invalid';
+              const isWarning = fieldResult?.status === 'Warning';
+              const inputBorderColor = isInvalid
+                ? '#DC2626'
+                : isWarning
+                ? '#CA8A04'
+                : '#E5E5EA';
+
+              return (
+                <View key={key} style={styles.fieldRow}>
+                  <Text style={styles.fieldLabel}>{key.replace(/_/g, ' ')}</Text>
+                  <TextInput
+                    style={[styles.fieldInput, { borderColor: inputBorderColor }]}
+                    value={val || ''}
+                    onChangeText={(newVal) => handleFieldChange(key, newVal)}
+                    placeholder={`Enter ${key.replace(/_/g, ' ')}`}
+                    placeholderTextColor="#AAAAAA"
+                    editable={!isSaving}
+                  />
+                  {renderFieldValidation(key)}
+                  {renderFieldValidIcon(key)}
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -512,6 +659,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: Typography.sizes.sm,
     color: Colors.pureBlack,
+  },
+  fieldValidationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+    paddingLeft: 2,
+  },
+  fieldValidationText: {
+    fontSize: 11,
+    fontWeight: Typography.weights.medium,
   },
   textPreviewCard: {
     backgroundColor: '#F8F9FA',

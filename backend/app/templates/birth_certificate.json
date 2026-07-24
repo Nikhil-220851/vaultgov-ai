@@ -1,0 +1,59 @@
+{
+  "template_id": "birth_certificate",
+  "document_type": "birth_certificate",
+  "display_name": "Birth Certificate",
+  "category": "Certificates",
+  "description": "Official Birth Certificate.",
+  "document_aliases": [
+    "birth certificate",
+    "certificate of birth",
+    "department of health"
+  ],
+  "required_fields": [
+    "registration_number",
+    "child_name",
+    "date_of_birth",
+    "place_of_birth",
+    "father_name",
+    "mother_name",
+    "issue_date"
+  ],
+  "optional_fields": [
+    "gender",
+    "issuing_authority",
+    "address_at_time_of_birth",
+    "registration_date"
+  ],
+  "field_hints": {
+    "registration_number": "Official registration format.",
+    "date_of_birth": "DOB of the child."
+  },
+  "field_types": {
+    "registration_number": "registration_number",
+    "date_of_birth": "date",
+    "issue_date": "date",
+    "registration_date": "date"
+  },
+  "validation_hints": {
+    "date_of_birth": "Format DD/MM/YYYY.",
+    "issue_date": "Format DD/MM/YYYY.",
+    "registration_number": "Official format."
+  },
+  "aliases": {},
+  "output_field_names": {
+    "registration_number": "registration_number",
+    "child_name": "child_name",
+    "date_of_birth": "date_of_birth",
+    "place_of_birth": "place_of_birth",
+    "father_name": "father_name",
+    "mother_name": "mother_name",
+    "issue_date": "issue_date",
+    "gender": "gender",
+    "issuing_authority": "issuing_authority",
+    "address_at_time_of_birth": "address_at_time_of_birth",
+    "registration_date": "registration_date"
+  },
+  "extraction_notes": "",
+  "supports_expiry": false,
+  "supports_notifications": false
+}

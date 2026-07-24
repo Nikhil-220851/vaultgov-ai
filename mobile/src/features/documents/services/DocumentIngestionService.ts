@@ -111,6 +111,7 @@ export class DocumentIngestionService {
     const confidence = typeof res.confidence === 'number' ? res.confidence : 0.9;
     const cloudinaryUrl = res.secure_url || undefined;
     const processingTime = res.processing_time || 0.0;
+    const validation = res.validation || undefined;
 
     return {
       documentTitle: title,
@@ -123,6 +124,7 @@ export class DocumentIngestionService {
       documentType: docType,
       source,
       processingTime,
+      validation,
     };
   }
 

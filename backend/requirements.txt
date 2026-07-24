@@ -2,7 +2,7 @@ alembic==1.16.4
 cloudinary==1.45.0
 fastapi==0.116.1
 firebase-admin==7.1.0
-google-genai==2.8.0
+google-genai
 httpx==0.28.1
 Pillow
 pillow-heif
@@ -13,5 +13,7 @@ pytest
 python-dotenv==1.1.1
 python-multipart==0.0.20
 pytesseract
+rapidfuzz
 SQLAlchemy==2.0.41
 uvicorn==0.35.0
+python-dateutil==2.9.0.post0

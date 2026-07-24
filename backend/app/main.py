@@ -6,6 +6,8 @@ from app.api.documents import router as documents_router
 from app.api.stats import router as stats_router
 from app.api.uploads import router as uploads_router
 from app.api.schemes import router as schemes_router
+from app.api.dashboard import router as dashboard_router
+from app.api.scheme_recommendations import router as scheme_recommendations_router
 from app.core.firebase_admin import initialize_firebase
 from app.database.connection import test_connection, DATABASE_URL
 from app.services.scheme_sync_job import SyncScheduler
@@ -32,7 +34,8 @@ app.include_router(documents_router, prefix="/api/v1")
 app.include_router(stats_router, prefix="/api/v1")
 app.include_router(uploads_router, prefix="/api/v1")
 app.include_router(schemes_router, prefix="/api/v1")
-
+app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(scheme_recommendations_router, prefix="/api/v1")
 
 # ─── Scheduler ────────────────────────────────────────────────────────────────
 scheduler = SyncScheduler(DATABASE_URL)

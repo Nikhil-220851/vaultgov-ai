@@ -13,6 +13,7 @@ class DocumentCreate(BaseModel):
     image_uri: Optional[str] = None
     source: str = "camera"
     confidence_score: Optional[float] = None
+    supports_expiry: Optional[bool] = False
 
     @field_validator("image_uri", mode="before")
     @classmethod
@@ -41,6 +42,18 @@ class DocumentResponse(BaseModel):
     image_uri: Optional[str]
     source: str
     confidence_score: Optional[float]
+    
+    # Phase 5 Fields
+    health_score: Optional[float]
+    status: Optional[str]
+    expiry_date: Optional[datetime]
+    renewal_priority: Optional[str]
+    last_opened_at: Optional[datetime]
+    validated_at: Optional[datetime]
+    status_changed_at: Optional[datetime]
+    supports_expiry: Optional[bool]
+    notification_enabled: Optional[bool]
+
     created_at: datetime
     updated_at: datetime
 

@@ -24,15 +24,12 @@ export const RecentDocumentCard = memo<RecentDocumentCardProps>(({ item, onPress
     month: 'short',
   });
 
-  // Confidence dot colour
-  const dotColor =
-    item.confidence_score === null
-      ? '#BDBDBD'
-      : item.confidence_score >= 95
-      ? '#43A047'
-      : item.confidence_score >= 75
-      ? '#FB8C00'
-      : '#E53935';
+  // Phase 5 Smart Vault Engine: Status dot colour
+  const status = (item as any).status; // Cast to any since VaultGovDocument types might take a moment to propagate
+  let dotColor = '#BDBDBD'; // Default / NO_EXPIRY
+  if (status === 'ACTIVE') dotColor = '#43A047'; // Green
+  else if (status === 'EXPIRING_SOON') dotColor = '#FB8C00'; // Orange
+  else if (status === 'EXPIRED') dotColor = '#E53935'; // Red
 
   return (
     <AnimatedPressable

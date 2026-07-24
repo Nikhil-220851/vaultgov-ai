@@ -1,0 +1,61 @@
+{
+  "template_id": "income_certificate",
+  "document_type": "income_certificate",
+  "display_name": "Income Certificate",
+  "category": "Certificates",
+  "description": "Certificate proving annual income.",
+  "document_aliases": [
+    "income certificate",
+    "annual income",
+    "revenue department"
+  ],
+  "required_fields": [
+    "certificate_number",
+    "applicant_name",
+    "father_name",
+    "issue_date",
+    "issuing_authority",
+    "annual_income_rupees"
+  ],
+  "optional_fields": [
+    "expiry_date",
+    "address"
+  ],
+  "field_hints": {
+    "certificate_number": "Application or Certificate number.",
+    "applicant_name": "Name of the applicant.",
+    "father_name": "Father's name.",
+    "annual_income": "Total annual income in INR.",
+    "issue_date": "Date of certificate issue.",
+    "issuing_authority": "Tahsildar or equivalent issuing authority.",
+    "expiry_date": "Valid until date, if any.",
+    "address": "Address of the applicant."
+  },
+  "field_types": {
+    "certificate_number": "registration_number",
+    "issue_date": "date",
+    "annual_income_rupees": "income",
+    "expiry_date": "date"
+  },
+  "validation_hints": {
+    "annual_income": "Numeric value.",
+    "issue_date": "Format DD/MM/YYYY.",
+    "certificate_number": "Official format.",
+    "annual_income_rupees": "Numeric Rupees.",
+    "expiry_date": "Format DD/MM/YYYY."
+  },
+  "aliases": {},
+  "output_field_names": {
+    "certificate_number": "certificate_number",
+    "applicant_name": "applicant_name",
+    "father_name": "father_name",
+    "issue_date": "issue_date",
+    "issuing_authority": "issuing_authority",
+    "expiry_date": "expiry_date",
+    "address": "address",
+    "annual_income_rupees": "annual_income_rupees"
+  },
+  "extraction_notes": "Often state-specific formats.",
+  "supports_expiry": true,
+  "supports_notifications": true
+}

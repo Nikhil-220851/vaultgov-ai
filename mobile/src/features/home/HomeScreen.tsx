@@ -172,15 +172,15 @@ export const HomeScreen: React.FC = () => {
           />
           <OverviewCard
             item={{
-              id: 'categories',
-              label: 'Categories',
-              count: stats?.total_categories ?? 0,
-              iconName: 'folder-outline',
+              id: 'health',
+              label: 'Avg Health',
+              count: stats?.average_health_score ?? 0,
+              iconName: 'pulse-outline',
               type: 'success',
             }}
             isFirst={false}
             isLast={true}
-            onPress={() => handleOverviewPress('docs')}
+            onPress={() => handleOverviewPress('health')}
           />
         </View>
 

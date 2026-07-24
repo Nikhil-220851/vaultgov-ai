@@ -1,0 +1,19 @@
+{
+  "scheme_id": "farmer_subsidy",
+  "display_name": "PM Fasal Bima Yojana (Crop Insurance)",
+  "description": "Comprehensive crop insurance scheme providing financial support to farmers suffering crop loss due to unforeseen calamities.",
+  "category": "Agriculture",
+  "priority": 2,
+  "required_documents": [
+    "aadhaar",
+    "bank_passbook",
+    "land_record"
+  ],
+  "optional_documents": [
+    "income_certificate",
+    "ration_card",
+    "cancelled_cheque"
+  ],
+  "eligibility_notes": "All farmers — sharecroppers and tenant farmers included — growing notified crops in notified areas.",
+  "official_link": "https://pmfby.gov.in"
+}

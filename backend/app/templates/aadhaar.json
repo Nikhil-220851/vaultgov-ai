@@ -1,7 +1,16 @@
 {
+  "template_id": "aadhaar",
   "document_type": "aadhaar",
   "display_name": "Aadhaar Card",
+  "category": "Identity",
   "description": "India's national biometric identity document issued by UIDAI.",
+  "document_aliases": [
+    "uidai",
+    "aadhaar",
+    "aadhaar card",
+    "unique identification authority",
+    "government of india"
+  ],
   "required_fields": [
     "aadhaar_number",
     "full_name",
@@ -26,15 +35,66 @@
     "vid": "16-digit Virtual ID (VID) if printed on the card.",
     "issue_date": "Date of card issue if printed."
   },
+  "field_types": {
+    "aadhaar_number": "aadhaar",
+    "date_of_birth": "date",
+    "mobile_number": "phone",
+    "email": "email",
+    "issue_date": "date"
+  },
+  "validation_hints": {
+    "aadhaar_number": "12 digits exactly.",
+    "date_of_birth": "Format DD/MM/YYYY.",
+    "gender": "Expected: Male, Female, or Transgender.",
+    "mobile_number": "10 digits exactly.",
+    "vid": "Must be exactly 16 digits.",
+    "issue_date": "Format DD/MM/YYYY."
+  },
   "aliases": {
-    "aadhaar_number": ["uid", "aadhar no", "aadhaar no", "enrollment no", "aadhaar id", "unique id", "aadhaar"],
-    "full_name": ["name", "resident name", "applicant name", "holder name"],
-    "date_of_birth": ["dob", "birth date", "born", "yob", "year of birth", "date of birth"],
-    "gender": ["sex"],
-    "address": ["addr", "residential address", "permanent address"],
-    "mobile_number": ["mobile", "phone", "contact number"],
-    "email": ["email id", "e-mail"],
-    "vid": ["virtual id", "virtual identification number"]
+    "aadhaar_number": [
+      "uid",
+      "aadhar no",
+      "aadhaar no",
+      "enrollment no",
+      "aadhaar id",
+      "unique id",
+      "aadhaar"
+    ],
+    "full_name": [
+      "name",
+      "resident name",
+      "applicant name",
+      "holder name"
+    ],
+    "date_of_birth": [
+      "dob",
+      "birth date",
+      "born",
+      "yob",
+      "year of birth",
+      "date of birth"
+    ],
+    "gender": [
+      "sex"
+    ],
+    "address": [
+      "addr",
+      "residential address",
+      "permanent address"
+    ],
+    "mobile_number": [
+      "mobile",
+      "phone",
+      "contact number"
+    ],
+    "email": [
+      "email id",
+      "e-mail"
+    ],
+    "vid": [
+      "virtual id",
+      "virtual identification number"
+    ]
   },
   "output_field_names": {
     "aadhaar_number": "aadhaar_number",
@@ -47,11 +107,7 @@
     "vid": "vid",
     "issue_date": "issue_date"
   },
-  "validation_hints": {
-    "aadhaar_number": "Must be exactly 12 digits. Digits only after stripping spaces and hyphens. Must not start with 0 or 1.",
-    "date_of_birth": "Expected format DD/MM/YYYY. Year should be plausible (1900–present).",
-    "gender": "Expected: Male, Female, or Transgender.",
-    "mobile_number": "10 digits. First digit should be 6, 7, 8, or 9.",
-    "vid": "Must be exactly 16 digits."
-  }
+  "extraction_notes": "",
+  "supports_expiry": false,
+  "supports_notifications": false
 }

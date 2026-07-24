@@ -59,97 +59,80 @@ async def upload_pdf(
         # Document Intelligence Integration
         document_intelligence_success = False
         structured_data = None
-        doc_type = "pdf"
         
         # Simple detection based on OCR text
-        text_lower = text.lower()
-        if "aadhaar" in text_lower or "uidai" in text_lower:
-            doc_type = "aadhaar"
-        elif "permanent account number" in text_lower or "income tax department" in text_lower:
-            doc_type = "pan"
-        elif "passport" in text_lower:
-            doc_type = "passport"
-        elif "driving licence" in text_lower or "driving license" in text_lower or "dl no" in text_lower:
-            doc_type = "driving_license"
-
-        if doc_type != "pdf":
-            try:
-                import traceback
-                from app.services.document_intelligence.document_intelligence_service import DocumentIntelligenceService
-                from app.services.document_intelligence.models import ExtractionRequest
-                
-                print("===== DOCUMENT INTELLIGENCE =====")
-                print(f"Detected document: {doc_type}")
-                print(f"Template: {doc_type}.json")
-                print("Calling Gemini...")
-                
-                start_time = time.time()
-                svc = DocumentIntelligenceService()
-                req = ExtractionRequest(document_type=doc_type, raw_ocr_text=text)
-                response = await svc.extract(req)
-                
-                structured_data = response.model_dump().get("fields", {})
-                document_intelligence_success = True
-                
-                print(f"Gemini response time: {time.time() - start_time:.2f}s")
-                print(f"Structured fields: {len(structured_data)}")
-                print("Extraction success")
-                print("=======================================")
-            except Exception as e:
-                import traceback
-                print("===== DOCUMENT INTELLIGENCE =====")
-                print(f"Gemini extraction failed: {type(e).__name__}: {e}")
-                traceback.print_exc()
-                print("=======================================")
-                document_intelligence_success = False
-                structured_data = None
+        print("Running TemplateMatcher...")
+        from app.services.document_intelligence.template_matcher import TemplateMatcher
         
-        display_names = {
-            "aadhaar": "Aadhaar Card",
-            "pan": "PAN Card",
-            "passport": "Passport",
-            "driving_license": "Driving Licence",
-            "unknown": "Unknown Document",
-            "pdf": "Document PDF"
-        }
-        categories = {
-            "aadhaar": "Identity",
-            "pan": "Identity",
-            "passport": "Identity",
-            "driving_license": "Identity",
-            "unknown": "Other",
-            "pdf": "Other"
-        }
+        matcher = TemplateMatcher()
+        match_result = matcher.match(text)
+        doc_type = match_result["template_id"]
+        display_name = match_result["display_name"]
+        category = match_result["category"]
+        confidence = match_result.get("confidence_score", 0.0) / 100.0
+
+        if doc_type != "unknown":
+            try:
+                print(f"Detected template:\n{doc_type} (Score: {match_result['confidence_score']}%)\nBuilding prompt...\nCalling Gemini...")
+                from app.services.document_intelligence.service import DocumentIntelligenceService
+                di_service = DocumentIntelligenceService()
+                
+                result = di_service.extract(
+                    document_type=doc_type,
+                    raw_ocr_text=text
+                )
+                structured_data = result.model_dump()
+                document_intelligence_success = True
+                confidence = result.overall_confidence
+            except Exception as e:
+                print(f"Document Intelligence failed: {e}")
+        else:
+            print("No template matched\nUsing generic extraction")
+            doc_type = "pdf"
+            display_name = "Document PDF"
+            category = "Other"
         
         flat_structured = {}
-        confidence = 0.9 if document_intelligence_success else 0.0
-        if structured_data and isinstance(structured_data, dict):
-            conf_scores = []
-            for k, v in structured_data.items():
-                if isinstance(v, dict):
-                    val = v.get("value")
-                    c = v.get("confidence")
-                    if c is not None:
-                        try:
-                            conf_scores.append(float(c))
-                        except (ValueError, TypeError):
-                            pass
-                    flat_structured[k] = val
-                else:
-                    flat_structured[k] = v
-            if conf_scores:
-                confidence = sum(conf_scores) / len(conf_scores)
+        validation_result = None
+        if structured_data and "fields" in structured_data:
+            fields = structured_data["fields"]
+            if isinstance(fields, dict):
+                for k, v in fields.items():
+                    if isinstance(v, dict):
+                        flat_structured[k] = v.get("value")
+                    else:
+                        flat_structured[k] = v
+                        
+                # Run ValidationEngine
+                try:
+                    from app.services.document_intelligence.template_loader import TemplateLoader
+                    from app.services.document_intelligence.validation_engine import ValidationEngine
+                    
+                    loader = TemplateLoader()
+                    template = loader.load(doc_type)
+                    validator = ValidationEngine()
+                    
+                    val_result = validator.validate(template, fields)
+                    validation_result = val_result.to_dict()
+                except Exception as e:
+                    print(f"Validation Engine failed: {e}")
+                    validation_result = {
+                        "score": 0.0,
+                        "overall_status": "Error",
+                        "field_results": {}
+                    }
 
         return {
             "secure_url": None,
             "public_id": None,
             "document_type": doc_type,
-            "display_name": display_names.get(doc_type, "Document PDF"),
-            "category": categories.get(doc_type, "Other"),
+            "display_name": display_name,
+            "category": category,
             "confidence": confidence,
             "extracted_text": text,
             "ocr_text": text,
-            "structured_data": flat_structured,
+            "structured_data": flat_structured if flat_structured else None,
+            "validation": validation_result,
             "document_intelligence_success": document_intelligence_success,
             "processing_time": round(time.time() - t_start, 2),
             "metadata": {
@@ -178,6 +161,56 @@ def get_documents(
     user_id = _get_user_id(db, current_uid)
     docs = document_service.get_documents(db, user_id)
     return [DocumentResponse.model_validate(d) for d in docs]
+
+
+@router.get("/categories", response_model=List[str])
+def get_categories(
+    current_uid: str = Depends(get_current_uid),
+) -> List[str]:
+    from app.services.document_intelligence.template_loader import TemplateLoader
+    
+    loader = TemplateLoader()
+    available_types = loader.list_available()
+    categories = set()
+    
+    for t_type in available_types:
+        try:
+            template = loader.load(t_type)
+            if template.category:
+                categories.add(template.category)
+        except Exception as e:
+            print(f"Failed to load template {t_type} for category extraction: {e}")
+            
+    return sorted(list(categories))
+
+
+@router.post("/validate")
+async def validate_document(payload: dict):
+    """
+    Endpoint for real-time validation on the frontend.
+    Accepts: { "document_type": "aadhaar", "fields": { "aadhaar_number": "1234..." } }
+    Returns: ValidationResult dict
+    """
+    try:
+        doc_type = payload.get("document_type")
+        fields = payload.get("fields", {})
+        
+        from app.services.document_intelligence.template_loader import TemplateLoader
+        from app.services.document_intelligence.validation_engine import ValidationEngine
+        
+        loader = TemplateLoader()
+        template = loader.load(doc_type)
+        validator = ValidationEngine()
+        
+        val_result = validator.validate(template, fields)
+        return val_result.to_dict()
+    except Exception as e:
+        print(f"Real-time validation failed: {e}")
+        return {
+            "score": 0.0,
+            "overall_status": "Error",
+            "field_results": {}
+        }
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)

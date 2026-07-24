@@ -1,0 +1,20 @@
+{
+  "scheme_id": "pm_awas_yojana",
+  "display_name": "Pradhan Mantri Awas Yojana (PMAY)",
+  "description": "Housing for All — provides financial assistance to eligible beneficiaries for construction or purchase of a house.",
+  "category": "Housing",
+  "priority": 2,
+  "required_documents": [
+    "aadhaar",
+    "income_certificate",
+    "bank_passbook"
+  ],
+  "optional_documents": [
+    "caste_certificate",
+    "ration_card",
+    "domicile_certificate",
+    "pan"
+  ],
+  "eligibility_notes": "Families without a pucca house. Income criteria vary by category (EWS/LIG/MIG). Must be the first house.",
+  "official_link": "https://pmaymis.gov.in"
+}

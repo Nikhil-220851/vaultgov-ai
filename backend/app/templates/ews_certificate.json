@@ -1,0 +1,54 @@
+{
+  "template_id": "ews_certificate",
+  "document_type": "ews_certificate",
+  "display_name": "EWS Certificate",
+  "category": "Certificates",
+  "description": "Economically Weaker Section Certificate.",
+  "document_aliases": [
+    "economically weaker section",
+    "ews",
+    "income and asset certificate"
+  ],
+  "required_fields": [
+    "certificate_number",
+    "applicant_name",
+    "father_name",
+    "financial_year",
+    "issue_date",
+    "issuing_authority"
+  ],
+  "optional_fields": [
+    "family_income",
+    "address",
+    "valid_for_year"
+  ],
+  "field_hints": {
+    "financial_year": "Financial year the income relates to (e.g., 2023-2024).",
+    "valid_for_year": "The year for which this is valid."
+  },
+  "field_types": {
+    "certificate_number": "registration_number",
+    "issue_date": "date",
+    "family_income": "income"
+  },
+  "validation_hints": {
+    "financial_year": "Format YYYY-YYYY.",
+    "issue_date": "Format DD/MM/YYYY.",
+    "certificate_number": "Official format."
+  },
+  "aliases": {},
+  "output_field_names": {
+    "certificate_number": "certificate_number",
+    "applicant_name": "applicant_name",
+    "father_name": "father_name",
+    "financial_year": "financial_year",
+    "issue_date": "issue_date",
+    "issuing_authority": "issuing_authority",
+    "family_income": "family_income",
+    "address": "address",
+    "valid_for_year": "valid_for_year"
+  },
+  "extraction_notes": "Valid for one specific year.",
+  "supports_expiry": true,
+  "supports_notifications": true
+}

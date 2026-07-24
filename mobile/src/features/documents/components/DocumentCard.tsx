@@ -12,18 +12,55 @@ interface DocumentCardProps {
 }
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({ item, onPress }) => {
-  // Determine color scheme based on document state
+  // Phase 5 Smart Vault Engine: Determine color scheme based on document status
   const getCardStyles = () => {
-    // For Phase 3A, all docs are neutral until we have a real expiration system
-    return {
-      cardBg: Colors.white,
-      cardBorder: '#E6E6E6',
-      iconBg: '#F2F2F2',
-      iconColor: Colors.darkGray,
-      badgeBg: '#F2F2F2',
-      badgeText: Colors.darkGray,
-      badgeBorder: '#C0C0C0',
-    };
+    const status = item.status;
+    if (status === 'ACTIVE') {
+      return {
+        cardBg: Colors.white,
+        cardBorder: '#E6E6E6',
+        iconBg: '#E8F5E9',
+        iconColor: '#2E7D32', // Green
+        badgeBg: '#E8F5E9',
+        badgeText: '#2E7D32',
+        badgeBorder: '#A5D6A7',
+        badgeLabel: '🟢 Active'
+      };
+    } else if (status === 'EXPIRING_SOON') {
+      return {
+        cardBg: Colors.white,
+        cardBorder: '#E6E6E6',
+        iconBg: '#FFF8E1',
+        iconColor: '#F57F17', // Yellow/Orange
+        badgeBg: '#FFF8E1',
+        badgeText: '#F57F17',
+        badgeBorder: '#FFE082',
+        badgeLabel: '🟡 Expiring Soon'
+      };
+    } else if (status === 'EXPIRED') {
+      return {
+        cardBg: Colors.white,
+        cardBorder: '#E6E6E6',
+        iconBg: '#FFEBEE',
+        iconColor: '#C62828', // Red
+        badgeBg: '#FFEBEE',
+        badgeText: '#C62828',
+        badgeBorder: '#EF9A9A',
+        badgeLabel: '🔴 Expired'
+      };
+    } else {
+      // NO_EXPIRY or INVALID_DATE
+      return {
+        cardBg: Colors.white,
+        cardBorder: '#E6E6E6',
+        iconBg: '#F2F2F2',
+        iconColor: Colors.darkGray,
+        badgeBg: '#F2F2F2',
+        badgeText: Colors.darkGray,
+        badgeBorder: '#C0C0C0',
+        badgeLabel: '⚪ No Expiry'
+      };
+    }
   };
 
   const cardStyles = getCardStyles();
@@ -60,7 +97,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({ item, onPress }) => 
         ]}
       >
         <Text style={[styles.badgeText, { color: cardStyles.badgeText }]}>
-          {item.source === 'camera' ? 'Scanned' : 'Uploaded'}
+          {cardStyles.badgeLabel}
         </Text>
       </View>
     </AnimatedPressable>

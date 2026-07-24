@@ -28,6 +28,7 @@ export const DocumentsScreen: React.FC = () => {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('All');
+  const [sortOption, setSortOption] = useState<'Recent' | 'Health' | 'Expiry'>('Recent');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   // Prevents concurrent/duplicate document picker invocations
   const [isPickingPdf, setIsPickingPdf] = useState(false);
@@ -39,7 +40,13 @@ export const DocumentsScreen: React.FC = () => {
     ? displayName.trim().charAt(0).toUpperCase()
     : 'U';
 
-  const uniqueCategories = Array.from(new Set(documents.map(d => d.category || 'Uncategorised')));
+  const uniqueCategories = [
+    ...Array.from(new Set(documents.map(d => d.category || 'Uncategorised'))),
+    'Active',
+    'Expiring Soon',
+    'Expired',
+    'No Expiry'
+  ];
 
   const handleAvatarPress = () => {
     console.log('[DocumentsScreen] User profile avatar pressed');
@@ -113,13 +120,46 @@ export const DocumentsScreen: React.FC = () => {
 
   const filteredDocuments = documents.filter((doc) => {
     const docCategory = doc.category || 'Uncategorised';
-    const matchesCategory =
-      selectedCategory === 'All' || docCategory === selectedCategory;
+    
+    // Support filtering by "Expired", "Expiring Soon", "Active", "No Expiry" in the category dropdown (Phase 5)
+    // If the selected category is one of these status strings, we filter by status instead of category.
+    let matchesCategory = false;
+    if (selectedCategory === 'All') {
+      matchesCategory = true;
+    } else if (['Expired', 'Expiring Soon', 'Active', 'No Expiry'].includes(selectedCategory as string)) {
+      const statusMap: Record<string, string> = {
+        'Expired': 'EXPIRED',
+        'Expiring Soon': 'EXPIRING_SOON',
+        'Active': 'ACTIVE',
+        'No Expiry': 'NO_EXPIRY'
+      };
+      matchesCategory = (doc as any).status === statusMap[selectedCategory as string];
+    } else {
+      matchesCategory = docCategory === selectedCategory;
+    }
+    
     const query = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      query === '' ||
-      doc.title.toLowerCase().includes(query);
+    const searchTarget = `${doc.title} ${doc.category || ''} ${(doc as any).extracted_text || ''}`.toLowerCase();
+    const matchesSearch = query === '' || searchTarget.includes(query);
     return matchesCategory && matchesSearch;
+  }).sort((a, b) => {
+    // Smart Sorting (Phase 5)
+    if (sortOption === 'Recent') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    } else if (sortOption === 'Health') {
+      return ((b as any).health_score || 0) - ((a as any).health_score || 0);
+    } else if (sortOption === 'Expiry') {
+      // Push EXPIRED and EXPIRING_SOON to top, ACTIVE to middle, NO_EXPIRY to bottom
+      const priorityMap: Record<string, number> = {
+        'EXPIRED': 4,
+        'EXPIRING_SOON': 3,
+        'ACTIVE': 2,
+        'NO_EXPIRY': 1,
+        'INVALID_DATE': 0
+      };
+      return (priorityMap[(b as any).status] || 0) - (priorityMap[(a as any).status] || 0);
+    }
+    return 0;
   });
 
   if (isHydrating) {
@@ -156,6 +196,30 @@ export const DocumentsScreen: React.FC = () => {
       <View style={styles.container}>
         {/* Search Bar */}
         <DocumentSearchBar value={searchQuery} onChangeText={setSearchQuery} />
+
+        {/* Phase 5 Smart Sorting */}
+        <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}>
+          {(['Recent', 'Health', 'Expiry'] as const).map((opt) => (
+            <Pressable
+              key={opt}
+              onPress={() => setSortOption(opt)}
+              style={{
+                paddingVertical: 6,
+                paddingHorizontal: 12,
+                borderRadius: 16,
+                backgroundColor: sortOption === opt ? Colors.primaryBlue : '#F2F2F2',
+              }}
+            >
+              <Text style={{
+                color: sortOption === opt ? '#fff' : Colors.darkGray,
+                fontSize: 12,
+                fontWeight: '600'
+              }}>
+                {opt}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
         {/* Category Scrollable Chips */}
         <CategoryFilter

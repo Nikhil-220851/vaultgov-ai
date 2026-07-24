@@ -26,6 +26,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  ToastAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -59,7 +60,7 @@ interface DocumentDetailsScreenProps {
 
 export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id }) => {
   const router = useRouter();
-  const { documents, isHydrating } = useDocumentStore();
+  const isHydrating = useDocumentStore((state) => state.isHydrating);
 
   const [document, setDocument] = useState<VaultGovDocument | null>(null);
   const [isLoadingDoc, setIsLoadingDoc] = useState(true);
@@ -73,7 +74,7 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
       try {
         setIsLoadingDoc(true);
         // First try to find it in the store to avoid a loading flash if possible
-        const storeDoc = documents.find((doc) => doc.id === id);
+        const storeDoc = useDocumentStore.getState().documents.find((doc) => doc.id === id);
         if (storeDoc && isMounted) {
           setDocument(storeDoc);
         }
@@ -89,8 +90,10 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
         if (err?.message?.includes('404') || err?.response?.status === 404 || err?.status === 404 || err?.name === 'ApiError') {
           useDocumentStore.getState().removeDocument(id);
           useStatsStore.getState().fetchStats();
-          Alert.alert('Not Found', 'This document no longer exists.');
-          router.back();
+          if (isMounted) {
+            Alert.alert('Not Found', 'This document no longer exists.');
+            router.back();
+          }
         }
       } finally {
         if (isMounted) setIsLoadingDoc(false);
@@ -106,7 +109,7 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
     return () => {
       isMounted = false;
     };
-  }, [id, documents]);
+  }, [id]);
 
   // ── Build detail rows (memoised, avoids re-render on unrelated state changes)
   const detailRows = useMemo(() => {
@@ -172,7 +175,7 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
 
   // ── Delete with confirmation ─────────────────────────────────────────────────
   const handleDelete = useCallback(() => {
-    if (!document) return;
+    if (!document || isDeleting) return;
 
     Alert.alert(
       'Delete this document?',
@@ -193,21 +196,31 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
               // 3. Remove from the global store so list screens update immediately
               useDocumentStore.getState().removeDocument(document.id);
 
-              // 4. Update the dashboard stats
+              // 4. Update the dashboard stats and refresh document list
+              useDocumentStore.getState().fetchDocuments();
               await useStatsStore.getState().fetchStats();
 
-              // 5. Navigate back — the list will have already updated
-              router.back();
+              // 5. Show success toast/snackbar
+              if (Platform.OS === 'android') {
+                ToastAndroid.show('Document deleted successfully.', ToastAndroid.SHORT);
+              } else {
+                Alert.alert('Success', 'Document deleted successfully.');
+              }
+
+              // 6. Navigate back — the list will have already updated
+              if (router.canGoBack()) {
+                router.back();
+              }
             } catch (err) {
               console.error('[DocumentDetails] Delete error:', err);
-              Alert.alert('Delete Failed', 'An error occurred. Please try again.');
+              Alert.alert('Delete Failed', 'Unable to delete document. Please try again.');
               setIsDeleting(false);
             }
           },
         },
       ]
     );
-  }, [document, router]);
+  }, [document, isDeleting, router]);
 
   // ── Loading state (fetching document or store hydrating) ────────────────────
   if (isHydrating || isLoadingDoc) {

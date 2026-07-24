@@ -1,0 +1,58 @@
+{
+  "template_id": "bank_passbook",
+  "document_type": "bank_passbook",
+  "display_name": "Bank Passbook",
+  "category": "Financial",
+  "description": "First page of bank passbook.",
+  "document_aliases": [
+    "passbook",
+    "ifsc",
+    "bank",
+    "account number",
+    "branch"
+  ],
+  "required_fields": [
+    "account_number",
+    "ifsc_code",
+    "account_holder_name",
+    "bank_name",
+    "branch_name"
+  ],
+  "optional_fields": [
+    "cif_number",
+    "micr_code",
+    "address",
+    "account_type",
+    "branch_address"
+  ],
+  "field_hints": {
+    "account_number": "Bank account number.",
+    "ifsc_code": "11-character Indian Financial System Code.",
+    "bank_name": "Name of the bank.",
+    "cif_number": "Customer Information File number."
+  },
+  "field_types": {
+    "account_number": "account_number",
+    "ifsc_code": "ifsc"
+  },
+  "validation_hints": {
+    "account_number": "Numeric.",
+    "ifsc_code": "11 characters exactly."
+  },
+  "aliases": {},
+  "output_field_names": {
+    "account_number": "account_number",
+    "ifsc_code": "ifsc_code",
+    "account_holder_name": "account_holder_name",
+    "bank_name": "bank_name",
+    "branch_name": "branch_name",
+    "cif_number": "cif_number",
+    "micr_code": "micr_code",
+    "address": "address",
+    "account_type": "account_type",
+    "branch_address": "branch_address"
+  },
+  "extraction_notes": "",
+  "supports_expiry": false,
+  "supports_notifications": false
+}

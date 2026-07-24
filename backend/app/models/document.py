@@ -8,6 +8,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
 )
+import sqlalchemy
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
@@ -47,6 +48,18 @@ class Document(Base):
     image_uri = Column(String, nullable=True)
     source = Column(String(50), nullable=False, default="camera")
     confidence_score = Column(Float, nullable=True)
+    
+    # Phase 5: Smart Vault Engine Fields
+    health_score = Column(Float, nullable=True)
+    status = Column(String(50), nullable=True, default="NO_EXPIRY")
+    expiry_date = Column(DateTime(timezone=True), nullable=True)
+    renewal_priority = Column(String(50), nullable=True, default="NONE")
+    last_opened_at = Column(DateTime(timezone=True), nullable=True)
+    validated_at = Column(DateTime(timezone=True), nullable=True)
+    status_changed_at = Column(DateTime(timezone=True), nullable=True)
+    supports_expiry = Column(sqlalchemy.Boolean, nullable=True, default=False)
+    notification_enabled = Column(sqlalchemy.Boolean, nullable=True, default=True)
+
     saved_at = Column(
         DateTime(timezone=True),
         nullable=False,

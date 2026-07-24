@@ -1,0 +1,49 @@
+{
+  "template_id": "domicile_certificate",
+  "document_type": "domicile_certificate",
+  "display_name": "Domicile Certificate",
+  "category": "Certificates",
+  "description": "Certificate of residence/domicile.",
+  "document_aliases": [
+    "domicile certificate",
+    "resident certificate",
+    "residence certificate"
+  ],
+  "required_fields": [
+    "certificate_number",
+    "applicant_name",
+    "father_name",
+    "address",
+    "issue_date",
+    "issuing_authority"
+  ],
+  "optional_fields": [
+    "duration_of_residence",
+    "place_of_issue"
+  ],
+  "field_hints": {
+    "duration_of_residence": "Number of years residing at the address."
+  },
+  "field_types": {
+    "certificate_number": "registration_number",
+    "issue_date": "date"
+  },
+  "validation_hints": {
+    "issue_date": "Format DD/MM/YYYY.",
+    "certificate_number": "Official format."
+  },
+  "aliases": {},
+  "output_field_names": {
+    "certificate_number": "certificate_number",
+    "applicant_name": "applicant_name",
+    "father_name": "father_name",
+    "address": "address",
+    "issue_date": "issue_date",
+    "issuing_authority": "issuing_authority",
+    "duration_of_residence": "duration_of_residence",
+    "place_of_issue": "place_of_issue"
+  },
+  "extraction_notes": "Also known as Resident Certificate.",
+  "supports_expiry": false,
+  "supports_notifications": false
+}

@@ -1,0 +1,21 @@
+{
+  "scheme_id": "national_scholarship",
+  "display_name": "National Scholarship Portal (NSP)",
+  "description": "Central government scholarships for meritorious students from economically weaker sections across school, college, and university levels.",
+  "category": "Education",
+  "priority": 2,
+  "required_documents": [
+    "aadhaar",
+    "income_certificate",
+    "10th_marksheet",
+    "bank_passbook"
+  ],
+  "optional_documents": [
+    "caste_certificate",
+    "domicile_certificate",
+    "12th_marksheet",
+    "degree_certificate"
+  ],
+  "eligibility_notes": "Students from families with annual income below the scheme-specific threshold. Merit-based. Requires active enrolment in a recognised institution.",
+  "official_link": "https://scholarships.gov.in"
+}

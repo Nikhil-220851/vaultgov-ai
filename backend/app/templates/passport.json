@@ -1,7 +1,14 @@
 {
+  "template_id": "passport",
   "document_type": "passport",
   "display_name": "Passport",
+  "category": "Identity",
   "description": "Indian Passport (Type P) issued by the Ministry of External Affairs.",
+  "document_aliases": [
+    "passport",
+    "republic of india",
+    "ministry of external affairs"
+  ],
   "required_fields": [
     "passport_number",
     "surname",
@@ -39,19 +46,72 @@
     "spouse_name": "Spouse's name if printed.",
     "address": "Permanent residential address if printed on the last page.",
     "file_number": "Application file number if visible.",
-    "mrz_line1": "First line of the Machine Readable Zone (MRZ) — 44 characters.",
-    "mrz_line2": "Second line of the Machine Readable Zone (MRZ) — 44 characters."
+    "mrz_line1": "First line of the Machine Readable Zone (MRZ) \u00e2\u20ac\u201d 44 characters.",
+    "mrz_line2": "Second line of the Machine Readable Zone (MRZ) \u00e2\u20ac\u201d 44 characters."
+  },
+  "field_types": {
+    "passport_number": "passport",
+    "date_of_birth": "date",
+    "date_of_issue": "date",
+    "date_of_expiry": "date"
+  },
+  "validation_hints": {
+    "passport_number": "Alphanumeric.",
+    "date_of_birth": "Format DD/MM/YYYY.",
+    "date_of_issue": "Format DD/MM/YYYY.",
+    "date_of_expiry": "Format DD/MM/YYYY.",
+    "nationality": "Should be 'INDIAN'.",
+    "gender": "Expected: M or F.",
+    "mrz_line1": "Should be exactly 44 characters including padding '<'.",
+    "mrz_line2": "Should be exactly 44 characters including padding '<'."
   },
   "aliases": {
-    "passport_number": ["passport no", "document no", "doc no", "travel document number"],
-    "surname": ["last name", "family name", "nom"],
-    "given_names": ["given name", "first name", "names", "prenoms"],
-    "nationality": ["nationalite", "country"],
-    "date_of_birth": ["dob", "birth date", "date of birth", "date naissance"],
-    "date_of_issue": ["issue date", "date of issue", "issued on"],
-    "date_of_expiry": ["expiry date", "date of expiry", "valid until", "expiration date"],
-    "place_of_birth": ["birth place", "pob"],
-    "place_of_issue": ["issued at", "issuing authority"]
+    "passport_number": [
+      "passport no",
+      "document no",
+      "doc no",
+      "travel document number"
+    ],
+    "surname": [
+      "last name",
+      "family name",
+      "nom"
+    ],
+    "given_names": [
+      "given name",
+      "first name",
+      "names",
+      "prenoms"
+    ],
+    "nationality": [
+      "nationalite",
+      "country"
+    ],
+    "date_of_birth": [
+      "dob",
+      "birth date",
+      "date of birth",
+      "date naissance"
+    ],
+    "date_of_issue": [
+      "issue date",
+      "date of issue",
+      "issued on"
+    ],
+    "date_of_expiry": [
+      "expiry date",
+      "date of expiry",
+      "valid until",
+      "expiration date"
+    ],
+    "place_of_birth": [
+      "birth place",
+      "pob"
+    ],
+    "place_of_issue": [
+      "issued at",
+      "issuing authority"
+    ]
   },
   "output_field_names": {
     "passport_number": "passport_number",
@@ -72,14 +132,7 @@
     "mrz_line1": "mrz_line1",
     "mrz_line2": "mrz_line2"
   },
-  "validation_hints": {
-    "passport_number": "Exactly 8 characters: 1 uppercase letter followed by 7 digits. Example: B1234567.",
-    "date_of_birth": "Format DD/MM/YYYY. Year must be plausible (1900–present).",
-    "date_of_issue": "Format DD/MM/YYYY. Must be on or before date_of_expiry.",
-    "date_of_expiry": "Format DD/MM/YYYY. Typically 10 years after date_of_issue.",
-    "nationality": "Should be 'INDIAN'.",
-    "gender": "Expected: M or F.",
-    "mrz_line1": "Should be exactly 44 characters including padding '<'.",
-    "mrz_line2": "Should be exactly 44 characters including padding '<'."
-  }
+  "extraction_notes": "",
+  "supports_expiry": true,
+  "supports_notifications": true
 }

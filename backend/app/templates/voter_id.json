@@ -1,0 +1,67 @@
+{
+  "template_id": "voter_id",
+  "document_type": "voter_id",
+  "display_name": "Voter ID",
+  "category": "Identity",
+  "description": "Indian Voter ID Card (EPIC)",
+  "document_aliases": [
+    "election commission",
+    "epic",
+    "elector photo identity card",
+    "voter id",
+    "voter card"
+  ],
+  "required_fields": [
+    "epic_number",
+    "name",
+    "father_or_husband_name",
+    "date_of_birth",
+    "gender"
+  ],
+  "optional_fields": [
+    "address",
+    "assembly_constituency",
+    "issue_date"
+  ],
+  "field_hints": {
+    "epic_number": "Alphanumeric Voter ID number (e.g., ABC1234567).",
+    "name": "Elector's name.",
+    "father_or_husband_name": "Father's or Husband's name.",
+    "date_of_birth": "Date of Birth or Age.",
+    "gender": "Male or Female.",
+    "address": "Full residential address.",
+    "assembly_constituency": "Name of the assembly constituency.",
+    "issue_date": "Date of issue."
+  },
+  "field_types": {
+    "date_of_birth": "date",
+    "issue_date": "date"
+  },
+  "validation_hints": {
+    "epic_number": "Usually 3 letters followed by 7 digits.",
+    "date_of_birth": "Format DD/MM/YYYY or Age in years.",
+    "issue_date": "Format DD/MM/YYYY."
+  },
+  "aliases": {
+    "epic_number": [
+      "epic no",
+      "voter id no"
+    ],
+    "name": [
+      "elector name"
+    ]
+  },
+  "output_field_names": {
+    "epic_number": "epic_number",
+    "name": "name",
+    "father_or_husband_name": "father_or_husband_name",
+    "date_of_birth": "date_of_birth",
+    "gender": "gender",
+    "address": "address",
+    "assembly_constituency": "assembly_constituency",
+    "issue_date": "issue_date"
+  },
+  "extraction_notes": "Can have front and back parts.",
+  "supports_expiry": false,
+  "supports_notifications": false
+}

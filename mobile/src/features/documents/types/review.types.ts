@@ -10,6 +10,22 @@ export type DocumentCategory =
   | 'Education'
   | 'Other';
 
+export type FieldValidationStatus = 'Valid' | 'Warning' | 'Invalid';
+
+export interface FieldValidationResult {
+  status: FieldValidationStatus;
+  reason?: string;
+}
+
+export interface ValidationResult {
+  score: number;
+  overall_status: 'Valid' | 'Warning' | 'Invalid' | 'Error';
+  field_results: Record<string, FieldValidationResult>;
+  /** Required fields from the template — provided by the backend ValidationEngine */
+  required_fields: string[];
+  supports_expiry?: boolean;
+}
+
 export interface ReviewModel {
   documentTitle: string;
   category: DocumentCategory;
@@ -21,6 +37,8 @@ export interface ReviewModel {
   documentType: string;
   source: 'camera' | 'gallery' | 'pdf';
   processingTime?: number;
+  /** Validation results from the backend ValidationEngine */
+  validation?: ValidationResult;
 }
 
 export interface IngestionResult {

@@ -1,0 +1,18 @@
+{
+  "scheme_id": "ews_reservation",
+  "display_name": "EWS Reservation (10% Quota)",
+  "description": "10% reservation in government jobs and educational institutions for Economically Weaker Sections of the general category.",
+  "category": "Education & Employment",
+  "priority": 2,
+  "required_documents": [
+    "aadhaar",
+    "ews_certificate",
+    "income_certificate"
+  ],
+  "optional_documents": [
+    "pan",
+    "domicile_certificate"
+  ],
+  "eligibility_notes": "General category candidates with annual family income below ₹8 lakh and not owning 5+ acres of agricultural land.",
+  "official_link": "https://socialjustice.gov.in"
+}

@@ -1,0 +1,19 @@
+{
+  "scheme_id": "old_age_pension",
+  "display_name": "Indira Gandhi National Old Age Pension (IGNOAPS)",
+  "description": "Monthly pension for senior citizens below poverty line aged 60 years and above.",
+  "category": "Social Welfare",
+  "priority": 1,
+  "required_documents": [
+    "aadhaar",
+    "bank_passbook",
+    "birth_certificate"
+  ],
+  "optional_documents": [
+    "income_certificate",
+    "ration_card",
+    "voter_id"
+  ],
+  "eligibility_notes": "Indian citizen aged 60+ years belonging to BPL household. Monthly pension ₹200–₹500 depending on age group.",
+  "official_link": "https://nsap.nic.in"
+}
