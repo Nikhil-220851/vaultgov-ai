@@ -137,6 +137,38 @@ export interface RecommendationsSummary {
   top_missing: string[];
 }
 
+export interface Notification {
+  id: string;
+  user_id: string;
+  document_id: string | null;
+  type: string;
+  category: string;
+  priority: string;
+  title: string;
+  message: string;
+  payload: Record<string, any> | null;
+  is_read: boolean;
+  delivery_status: string;
+  push_sent: boolean;
+  sent_at: string | null;
+  read_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationListResponse {
+  items: Notification[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
+export interface UnreadCountResponse {
+  count: number;
+}
+
 // ─── Internal state ───────────────────────────────────────────────────────────
 
 let _authToken: string | null = null;
@@ -150,6 +182,10 @@ function getHeaders(): Record<string, string> {
   if (_authToken) {
     headers['Authorization'] = `Bearer ${_authToken}`;
   }
+  // TODO: Remove Auth Debug Log
+  console.log(
+    `[Auth Debug] getHeaders() called. Token exists: ${!!_authToken}. Prefix: ${_authToken ? _authToken.substring(0, 20) + '...' : 'null'}`
+  );
   return headers;
 }
 
@@ -178,9 +214,14 @@ function normalizeError(err: any, timeoutMs: number, requestId: string): Error {
 }
 
 /**
- * Robust fetch wrapper that guarantees either a successful JSON response, 
+ * Robust fetch wrapper that guarantees either a successful JSON response,
  * an ApiError for HTTP errors, or a standard Error on timeout/network failure.
  * Timeout applies to the ENTIRE lifecycle, including response.json() parsing.
+ *
+ * Special handling for no-body status codes (204, 205, 304):
+ *   Returns undefined immediately — never calls response.json() — so DELETE
+ *   requests that return 204 No Content do NOT throw SyntaxError and are
+ *   never retried by fetchWithRetry.
  */
 async function fetchAndParse<T>(
   url: string,
@@ -197,6 +238,10 @@ async function fetchAndParse<T>(
   }, timeoutMs);
 
   try {
+    // TODO: Remove Auth Debug Log
+    const authHeader = (options.headers as Record<string, string>)?.['Authorization'];
+    console.log(`[Auth Debug] [${requestId}] ${options.method || 'GET'} ${url}`);
+    console.log(`[Auth Debug] [${requestId}] Authorization header present: ${!!authHeader}. Value prefix: ${authHeader ? authHeader.substring(0, 27) + '...' : 'MISSING — will get 401'}`);
     console.log(`[FETCH STARTED] [${requestId}] ${options.method || 'GET'} ${url}`);
     
     const response = await fetch(url, { ...options, signal });
@@ -214,6 +259,17 @@ async function fetchAndParse<T>(
       }
       console.error(`[API ERROR] [${requestId}] status=${response.status} detail=${detail}`);
       throw new ApiError(response.status, detail);
+    }
+
+    // No-body responses (204 No Content, 205 Reset Content, 304 Not Modified)
+    // must never attempt JSON parsing — there is no body to parse.
+    // Without this guard, response.json() throws SyntaxError: Unexpected end of input,
+    // which fetchWithRetry misidentifies as a transient failure and retries,
+    // causing a second DELETE that hits a now-deleted resource (404).
+    const NO_BODY_STATUSES = [204, 205, 304];
+    if (NO_BODY_STATUSES.includes(response.status)) {
+      console.log(`[RETURN SUCCESS] [${requestId}] ${response.status} No Content — skipping JSON parse.`);
+      return undefined as unknown as T;
     }
 
     console.log(`[BODY RECEIVING] [${requestId}] parsing JSON...`);
@@ -343,6 +399,14 @@ export const apiClient = {
 
   async createDocument(payload: DocumentCreatePayload): Promise<VaultGovDocument> {
     return fetchWithRetry<VaultGovDocument>(`${API_BASE_URL}/api/v1/documents/`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async validateDocument(payload: { document_type: string; fields: Record<string, string | null> }): Promise<any> {
+    return fetchWithRetry<any>(`${API_BASE_URL}/api/v1/documents/validate`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -552,5 +616,69 @@ export const apiClient = {
   async getRecommendationsSummary(): Promise<RecommendationsSummary> {
     const url = `${API_BASE_URL}/api/v1/schemes/recommendations/summary`;
     return fetchWithRetry<RecommendationsSummary>(url, { method: 'GET', headers: getHeaders() });
+  },
+
+  // ─── Notifications ─────────────────────────────────────────────────────────────
+
+  async getNotifications(page: number = 1, pageSize: number = 20, category?: string, unreadOnly: boolean = false): Promise<NotificationListResponse> {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      unread_only: unreadOnly.toString(),
+    });
+    if (category) {
+      queryParams.append('category', category);
+    }
+    return fetchWithRetry<NotificationListResponse>(`${API_BASE_URL}/api/v1/notifications/?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+  },
+
+  async getUnreadCount(): Promise<UnreadCountResponse> {
+    return fetchWithRetry<UnreadCountResponse>(`${API_BASE_URL}/api/v1/notifications/unread-count`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+  },
+
+  async markNotificationRead(id: string): Promise<{ success: boolean; notification?: Notification }> {
+    return fetchWithRetry<{ success: boolean; notification?: Notification }>(`${API_BASE_URL}/api/v1/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+    });
+  },
+
+  async markAllNotificationsRead(): Promise<{ success: boolean; affected: number }> {
+    return fetchWithRetry<{ success: boolean; affected: number }>(`${API_BASE_URL}/api/v1/notifications/read-all`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+    });
+  },
+
+  async deleteNotification(id: string): Promise<void> {
+    const requestId = generateRequestId();
+    await fetchWithRetry<void>(
+      `${API_BASE_URL}/api/v1/notifications/${id}`,
+      { method: 'DELETE', headers: getHeaders() },
+      API_TIMEOUT_MS,
+      API_MAX_RETRIES,
+      requestId
+    );
+  },
+
+  async clearAllNotifications(): Promise<{ success: boolean; affected: number }> {
+    return fetchWithRetry<{ success: boolean; affected: number }>(`${API_BASE_URL}/api/v1/notifications/clear`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+  },
+
+  async registerPushToken(token: string): Promise<{ success: boolean }> {
+    return fetchWithRetry<{ success: boolean }>(`${API_BASE_URL}/api/v1/notifications/register-push-token`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ token }),
+    });
   },
 };

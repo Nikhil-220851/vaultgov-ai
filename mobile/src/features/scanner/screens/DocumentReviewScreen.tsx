@@ -99,7 +99,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
       debounceRef.current = setTimeout(async () => {
         try {
           setIsValidating(true);
-          const result = await apiClient.post('/documents/validate', {
+          const result = await apiClient.validateDocument({
             document_type: reviewModel.documentType,
             fields: currentFields,
           });
@@ -177,9 +177,14 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         .map(([key]) => key);
 
       if (invalidRequiredKeys.length > 0) {
+        const firstMissing = invalidRequiredKeys[0];
+        const formattedName = firstMissing
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
         Alert.alert(
           'Cannot Save',
-          'Please correct all required fields before saving.',
+          `Please fill ${formattedName}.`,
           [{ text: 'OK' }]
         );
         return;

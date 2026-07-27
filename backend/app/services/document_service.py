@@ -1,5 +1,6 @@
 from typing import List, Optional
 from uuid import UUID
+import logging
 
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,9 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 from app.schemas.document import DocumentCreate, DocumentUpdate
 from app.services.vault_service import vault_service
+from app.services.notification_engine import notification_engine
+
+logger = logging.getLogger(__name__)
 
 
 def get_document(db: Session, document_id: UUID, user_id: UUID) -> Optional[Document]:
@@ -59,6 +63,18 @@ def create_document(db: Session, user_id: UUID, obj_in: DocumentCreate) -> Docum
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
+
+    try:
+        notification_engine.generate_upload_notification(
+            db=db,
+            user_id=user_id,
+            document_id=db_obj.id,
+            stage="success",
+            doc_title=db_obj.title
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate upload notification for document {db_obj.id}: {e}", exc_info=True)
+
     return db_obj
 
 
@@ -99,6 +115,18 @@ def delete_document(db: Session, document_id: UUID, user_id: UUID) -> bool:
     db_obj = get_document(db, document_id, user_id)
     if not db_obj:
         return False
+    
+    doc_title = db_obj.title
     db.delete(db_obj)
     db.commit()
+
+    try:
+        notification_engine.generate_delete_notification(
+            db=db,
+            user_id=user_id,
+            doc_title=doc_title
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate delete notification for document {document_id}: {e}", exc_info=True)
+
     return True

@@ -8,9 +8,11 @@ from app.api.uploads import router as uploads_router
 from app.api.schemes import router as schemes_router
 from app.api.dashboard import router as dashboard_router
 from app.api.scheme_recommendations import router as scheme_recommendations_router
+from app.api.notifications import router as notifications_router
 from app.core.firebase_admin import initialize_firebase
 from app.database.connection import test_connection, DATABASE_URL
 from app.services.scheme_sync_job import SyncScheduler
+from app.services.notification_scheduler import NotificationScheduler
 
 app = FastAPI(
     title="VaultGov API",
@@ -36,9 +38,11 @@ app.include_router(uploads_router, prefix="/api/v1")
 app.include_router(schemes_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(scheme_recommendations_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
 
-# ─── Scheduler ────────────────────────────────────────────────────────────────
+# ─── Schedulers ────────────────────────────────────────────────────────────────
 scheduler = SyncScheduler(DATABASE_URL)
+notification_scheduler = NotificationScheduler(DATABASE_URL)
 
 
 # ─── Startup & Shutdown ────────────────────────────────────────────────────────
@@ -87,11 +91,13 @@ def startup_event() -> None:
     print(f"[OK] Schemes router verified - {scheme_count} scheme endpoints registered.")
 
     scheduler.start()
+    notification_scheduler.start()
 
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:
     scheduler.stop()
+    notification_scheduler.stop()
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────

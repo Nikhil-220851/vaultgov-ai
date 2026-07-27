@@ -18,7 +18,7 @@ interface ProfileStatCardProps {
   suffix?: string;
 }
 
-export function ProfileStatCard({ icon, label, value, color, suffix = '' }: ProfileStatCardProps) {
+export function ProfileStatCard({ icon, label, value, color, suffix = '', emptyStateText }: ProfileStatCardProps & { emptyStateText?: string }) {
   const [displayed, setDisplayed] = useState(0);
   const [opacity] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(10));
@@ -37,6 +37,11 @@ export function ProfileStatCard({ icon, label, value, color, suffix = '' }: Prof
       }),
     ]).start();
 
+    if (value === 0 && emptyStateText) {
+      setDisplayed(0);
+      return;
+    }
+
     // Animated counter
     let start: number | null = null;
     const duration = 800;
@@ -48,7 +53,7 @@ export function ProfileStatCard({ icon, label, value, color, suffix = '' }: Prof
     };
     const raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [value, opacity, translateY]);
+  }, [value, opacity, translateY, emptyStateText]);
 
   return (
     <Animated.View
@@ -60,9 +65,13 @@ export function ProfileStatCard({ icon, label, value, color, suffix = '' }: Prof
       <View style={[styles.iconWrap, { backgroundColor: color + '18' }]}>
         <Ionicons name={icon} size={20} color={color} />
       </View>
-      <Text style={styles.value}>
-        {displayed}{suffix}
-      </Text>
+      {value === 0 && emptyStateText ? (
+        <Text style={styles.emptyText}>{emptyStateText}</Text>
+      ) : (
+        <Text style={styles.value}>
+          {displayed}{suffix}
+        </Text>
+      )}
       <Text style={styles.label}>{label}</Text>
     </Animated.View>
   );
@@ -100,6 +109,14 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.bold,
     color: Colors.pureBlack,
     marginBottom: 2,
+  },
+  emptyText: {
+    fontSize: Typography.sizes.xs,
+    color: Colors.darkGray,
+    marginBottom: 2,
+    textAlign: 'center',
+    minHeight: 26,
+    textAlignVertical: 'center',
   },
   label: {
     fontSize: Typography.sizes.xs,

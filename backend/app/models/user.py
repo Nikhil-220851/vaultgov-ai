@@ -39,6 +39,8 @@ class User(Base):
     occupation = Column(String(80), nullable=True)
     annual_income = Column(String(50), nullable=True)
     profile_completed = Column(Boolean, nullable=False, default=False)
+    expo_push_token = Column(String(200), nullable=True)
+    """Expo push notification token. Updated on each app launch after login."""
     # Tracks whether the user has passed through the Grant Permissions screen.
     # Used only for onboarding progress — never used to grant real device access.
     onboarding_permissions_seen = Column(Boolean, nullable=False, default=False)
