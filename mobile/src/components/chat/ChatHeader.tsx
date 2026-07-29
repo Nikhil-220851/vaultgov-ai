@@ -7,13 +7,25 @@ import { Colors, Spacing, Typography, Radius } from '@/theme';
 interface ChatHeaderProps {
   onBackPress?: () => void;
   onClearPress?: () => void;
+  onMenuPress?: () => void;
+  title?: string;
 }
 
-export function ChatHeader({ onBackPress, onClearPress }: ChatHeaderProps) {
+export function ChatHeader({ onBackPress, onClearPress, onMenuPress, title }: ChatHeaderProps) {
   return (
     <View style={styles.container}>
       <View style={styles.leftRow}>
-        {onBackPress && (
+        {onMenuPress && (
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={onMenuPress}
+            activeOpacity={0.75}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="menu" size={24} color={Colors.primaryBlue} />
+          </TouchableOpacity>
+        )}
+        {onBackPress && !onMenuPress && (
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={onBackPress}
@@ -30,7 +42,7 @@ export function ChatHeader({ onBackPress, onClearPress }: ChatHeaderProps) {
           <View style={styles.activeDot} />
         </View>
         <View style={styles.titleWrap}>
-          <Text style={styles.title}>GovAssist AI</Text>
+          <Text style={styles.title} numberOfLines={1}>{title || 'GovAssist AI'}</Text>
           <View style={styles.subtitleRow}>
             <Text style={styles.statusText}>Online</Text>
             <Text style={styles.bullet}>•</Text>

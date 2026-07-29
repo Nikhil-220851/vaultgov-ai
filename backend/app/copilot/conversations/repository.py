@@ -14,12 +14,12 @@ class ConversationRepository:
         return conversation
 
     def get_conversation(self, conversation_id: str) -> Optional[Conversation]:
-        return self.db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        return self.db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.is_deleted == False).first()
 
     def get_user_conversations(self, user_id: str, limit: int = 20, offset: int = 0) -> List[Conversation]:
         return (
             self.db.query(Conversation)
-            .filter(Conversation.user_id == user_id)
+            .filter(Conversation.user_id == user_id, Conversation.is_deleted == False)
             .order_by(Conversation.updated_at.desc())
             .limit(limit)
             .offset(offset)
@@ -37,7 +37,7 @@ class ConversationRepository:
     def delete_conversation(self, conversation_id: str) -> bool:
         conversation = self.get_conversation(conversation_id)
         if conversation:
-            self.db.delete(conversation)
+            conversation.is_deleted = True
             self.db.commit()
             return True
         return False

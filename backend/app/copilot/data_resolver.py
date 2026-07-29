@@ -11,9 +11,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.services import user_service, document_service
 from app.models.document import Document
-from app.models.scheme import Scheme
 from app.models.user import User
-from app.copilot.eligibility_engine import EligibilityEngine
 
 class DataResolver:
     @staticmethod
@@ -21,62 +19,7 @@ class DataResolver:
         """Fetch user by Firebase UID using user_service."""
         return user_service.get_user_by_uid(db, firebase_uid)
 
-    @classmethod
-    def resolve_documents(cls, db: Session, firebase_uid: str) -> Dict[str, Any]:
-        """Retrieve actual documents uploaded by the user, formatted structurally."""
-        user = cls.get_user_by_uid(db, firebase_uid)
-        if not user:
-            return {
-                "documents": [],
-                "count": 0,
-                "has_documents": False
-            }
-        
-        docs = document_service.get_documents(db, user.id)
-        return {
-            "documents": docs,
-            "count": len(docs),
-            "has_documents": len(docs) > 0
-        }
 
-    @classmethod
-    def resolve_expiring_documents(cls, db: Session, firebase_uid: str) -> Dict[str, Any]:
-        """
-        Retrieve documents requiring renewal or expiring soon, formatted structurally.
-        Criteria: visual_state is warning/danger, or expiry_text has expiry signals.
-        """
-        doc_res = cls.resolve_documents(db, firebase_uid)
-        docs = doc_res["documents"]
-        expiring = []
-        for d in docs:
-            if d.visual_state in ("warning", "danger"):
-                expiring.append(d)
-                continue
-            if d.expiry_text:
-                lower_text = d.expiry_text.lower()
-                if any(k in lower_text for k in ("expir", "expired", "warn", "danger")):
-                    expiring.append(d)
-        
-        return {
-            "documents": expiring,
-            "count": len(expiring),
-            "has_expiring": len(expiring) > 0
-        }
-
-    @staticmethod
-    def resolve_schemes(db: Session) -> Dict[str, Any]:
-        """Retrieve active government schemes, formatted structurally."""
-        schemes = (
-            db.query(Scheme)
-            .filter(Scheme.status.in_(("Active", "Upcoming", "Closing Soon", "Permanent")))
-            .order_by(Scheme.priorityScore.desc())
-            .all()
-        )
-        return {
-            "schemes": schemes,
-            "count": len(schemes),
-            "has_schemes": len(schemes) > 0
-        }
 
     @classmethod
     def resolve_profile(cls, db: Session, firebase_uid: str) -> Dict[str, Any]:
@@ -138,22 +81,4 @@ class DataResolver:
             "recent_uploads": recent
         }
 
-    @classmethod
-    def resolve_eligibility(cls, db: Session, firebase_uid: str) -> Dict[str, Any]:
-        """
-        Evaluate all active government schemes against the user's profile and
-        uploaded documents using the deterministic Eligibility Engine.
 
-        Delegates entirely to EligibilityEngine.evaluate_all(), which handles:
-          - User & document lookup
-          - Per-scheme rule evaluation (age, income, gender, location, occupation, education)
-          - Document checklist verification
-          - Confidence scoring
-          - Result grouping (eligible / partially_eligible / not_eligible / insufficient_information)
-          - 5-minute in-memory caching keyed by firebase_uid
-
-        Returns the engine's full grouped payload, or an empty default if the
-        user record does not exist.
-        """
-        result = EligibilityEngine.evaluate_all(db, firebase_uid)
-        return result

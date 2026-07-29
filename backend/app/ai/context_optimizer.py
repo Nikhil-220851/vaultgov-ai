@@ -26,6 +26,7 @@ class ContextOptimizer:
         # But we can also do extra trimming if needed.
         if "conversation_history" in optimized:
             max_history = int(os.getenv("AI_MAX_HISTORY", "10"))
-            optimized["conversation_history"] = optimized["conversation_history"][-max_history:]
+            if isinstance(optimized["conversation_history"], list):
+                optimized["conversation_history"] = optimized["conversation_history"][-max_history:]
             
         return optimized

@@ -9,6 +9,11 @@ import {
   Platform,
   StatusBar,
   ScrollView,
+  Animated,
+  Dimensions,
+  TouchableWithoutFeedback,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -21,8 +26,11 @@ import { SuggestedQuestionCard } from '@/components/chat/SuggestedQuestionCard';
 import { QuickChip } from '@/components/chat/QuickChip';
 import { AIResponseCard, AICardData } from '@/components/chat/AIResponseCard';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
-import { Colors, Spacing, Typography } from '@/theme';
-import { apiClient } from '@/services/api';
+import { Colors, Spacing, Typography, Radius } from '@/theme';
+import { apiClient, Conversation } from '@/services/api';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const DRAWER_WIDTH = SCREEN_WIDTH * 0.75;
 
 interface Message {
   id: string;
@@ -67,9 +75,38 @@ function extractCardDataFromMetadata(intent: string, metadata: any): AICardData 
       const isSuccess = doc.visual_state === 'success';
       const isWarning = doc.visual_state === 'warning';
       const isDanger = doc.visual_state === 'danger';
-      const badge = isSuccess ? 'Verified' : isWarning ? 'Needs Attention' : isDanger ? 'Action Required' : 'Uploaded';
-      const badgeColor = isSuccess ? Colors.primaryGreen : isWarning ? Colors.primaryOrange : isDanger ? Colors.dangerRed : Colors.darkGray;
       
+      let badge = isSuccess ? 'Verified' : isWarning ? 'Needs Attention' : isDanger ? 'Action Required' : 'Uploaded';
+      let badgeColor = isSuccess ? Colors.primaryGreen : isWarning ? Colors.primaryOrange : isDanger ? Colors.dangerRed : Colors.darkGray;
+      let primaryActionLabel = (isWarning || isDanger) ? 'Renew Now' : 'Locker Details';
+      let expiryInfo = 'Permanent';
+
+      let formattedDate = doc.expiry_date;
+      if (doc.expiry_date) {
+        const d = new Date(doc.expiry_date);
+        if (!isNaN(d.getTime())) {
+          formattedDate = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+      }
+
+      const docStatus = doc.status ? String(doc.status).toUpperCase() : '';
+
+      if (docStatus === 'EXPIRED') {
+        badge = 'Expired';
+        badgeColor = Colors.dangerRed;
+        expiryInfo = `Expired on ${formattedDate || 'Unknown Date'}`;
+        primaryActionLabel = 'Renew Now';
+      } else if (docStatus === 'EXPIRING_SOON') {
+        badge = 'Expiring Soon';
+        badgeColor = Colors.primaryOrange;
+        expiryInfo = `Expires on ${formattedDate || 'Unknown Date'}`;
+        primaryActionLabel = 'Renew Now';
+      } else if (doc.expiry_date) {
+        expiryInfo = `Expires on ${formattedDate}`;
+      } else if (!doc.expiry_date && (!docStatus || docStatus === 'NO_EXPIRY' || docStatus === 'VALID' || docStatus === 'PENDING' || docStatus === 'VERIFIED')) {
+        expiryInfo = 'Permanent';
+      }
+
       return {
         type: 'document',
         title: doc.title,
@@ -78,9 +115,9 @@ function extractCardDataFromMetadata(intent: string, metadata: any): AICardData 
         badgeColor: badgeColor,
         details: [
           { label: 'Category', value: doc.category || 'Uncategorised' },
-          { label: 'Expiry Info', value: doc.expiry_text || 'Permanent' },
+          { label: 'Expiry Info', value: expiryInfo },
         ],
-        primaryActionLabel: (isWarning || isDanger) ? 'Renew Now' : 'Locker Details',
+        primaryActionLabel: primaryActionLabel,
         iconName: doc.icon_name || 'document-text-outline',
       };
     }
@@ -89,15 +126,40 @@ function extractCardDataFromMetadata(intent: string, metadata: any): AICardData 
   else if (intent === 'document_reminder' && metadata.expiring_documents && metadata.expiring_documents.has_expiring) {
     const doc = metadata.expiring_documents.documents[0];
     if (doc) {
+      let expiryInfo = 'Expiring';
+      let formattedDate = doc.expiry_date;
+      if (doc.expiry_date) {
+        const d = new Date(doc.expiry_date);
+        if (!isNaN(d.getTime())) {
+          formattedDate = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+      }
+      
+      const docStatus = doc.status ? String(doc.status).toUpperCase() : '';
+      let badge = 'Expiring Soon';
+      let badgeColor = Colors.primaryOrange;
+      
+      if (docStatus === 'EXPIRED') {
+        badge = 'Expired';
+        badgeColor = Colors.dangerRed;
+        expiryInfo = `Expired on ${formattedDate || 'Unknown Date'}`;
+      } else if (docStatus === 'EXPIRING_SOON') {
+        badge = 'Expiring Soon';
+        badgeColor = Colors.primaryOrange;
+        expiryInfo = `Expires on ${formattedDate || 'Unknown Date'}`;
+      } else if (doc.expiry_date) {
+        expiryInfo = `Expires on ${formattedDate}`;
+      }
+
       return {
         type: 'document',
         title: doc.title,
         subtitle: doc.category || 'Government Document',
-        badge: 'Expiring Soon',
-        badgeColor: Colors.primaryOrange,
+        badge: badge,
+        badgeColor: badgeColor,
         details: [
-          { label: 'Expiry Info', value: doc.expiry_text || 'Expiring' },
-          { label: 'Status', value: 'Needs renewal action' },
+          { label: 'Expiry Info', value: expiryInfo },
+          { label: 'Status', value: docStatus === 'EXPIRED' ? 'Requires immediate action' : 'Needs renewal action' },
         ],
         primaryActionLabel: 'Renew Now',
         secondaryActionLabel: 'Locker Details',
@@ -188,6 +250,62 @@ export function GovAssistChatScreen() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Drawer State
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const drawerAnim = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
+  const [historyList, setHistoryList] = useState<Conversation[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState(false);
+
+  const openDrawer = () => {
+    setIsDrawerOpen(true);
+    loadHistoryList();
+    Animated.timing(drawerAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeDrawer = () => {
+    Animated.timing(drawerAnim, {
+      toValue: -SCREEN_WIDTH,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsDrawerOpen(false);
+    });
+  };
+
+  const loadHistoryList = async () => {
+    setIsLoadingList(true);
+    try {
+      const data = await apiClient.getConversations();
+      setHistoryList(data);
+    } catch (e) {
+      console.error('Failed to load history list', e);
+    } finally {
+      setIsLoadingList(false);
+    }
+  };
+
+  const startNewChat = () => {
+    closeDrawer();
+    if (currentConversationId !== null || messages.length > 0) {
+      setCurrentConversationId(null);
+      setMessages([]);
+      router.setParams({ conversation_id: 'null' });
+    }
+  };
+
+  const selectConversation = (id: string) => {
+    closeDrawer();
+    if (id !== currentConversationId) {
+      setCurrentConversationId(id);
+      setMessages([]);
+      router.setParams({ conversation_id: id });
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -350,11 +468,115 @@ export function GovAssistChatScreen() {
     );
   };
 
+  const renderDrawer = () => {
+    if (!isDrawerOpen) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    const groups: { title: string; data: Conversation[] }[] = [
+      { title: 'Today', data: [] },
+      { title: 'Yesterday', data: [] },
+      { title: 'Last 7 Days', data: [] },
+      { title: 'Older', data: [] },
+    ];
+
+    historyList.forEach(c => {
+      const d = new Date(c.updated_at);
+      if (d >= today) groups[0].data.push(c);
+      else if (d >= yesterday) groups[1].data.push(c);
+      else if (d >= lastWeek) groups[2].data.push(c);
+      else groups[3].data.push(c);
+    });
+
+    const activeGroups = groups.filter(g => g.data.length > 0);
+
+    return (
+      <View style={styles.drawerOverlay} pointerEvents="box-none">
+        <TouchableWithoutFeedback onPress={closeDrawer}>
+          <Animated.View style={[
+            styles.drawerBackdrop,
+            {
+              opacity: drawerAnim.interpolate({
+                inputRange: [-SCREEN_WIDTH, 0],
+                outputRange: [0, 0.5],
+              })
+            }
+          ]} />
+        </TouchableWithoutFeedback>
+
+        <Animated.View style={[
+          styles.drawerContainer,
+          { transform: [{ translateX: drawerAnim }] }
+        ]}>
+          <SafeAreaView style={styles.drawerSafeArea} edges={['top', 'bottom']}>
+            <View style={styles.drawerHeader}>
+              <Text style={styles.drawerTitle}>Chats</Text>
+              <TouchableOpacity onPress={startNewChat} style={styles.newChatBtn}>
+                <Ionicons name="add" size={20} color="#FFF" />
+                <Text style={styles.newChatText}>New Chat</Text>
+              </TouchableOpacity>
+            </View>
+
+            {isLoadingList ? (
+              <ActivityIndicator size="small" color={Colors.primaryBlue} style={{ marginTop: 20 }} />
+            ) : (
+              <ScrollView style={styles.drawerScroll} showsVerticalScrollIndicator={false}>
+                {activeGroups.map((group) => (
+                  <View key={group.title} style={styles.drawerGroup}>
+                    <Text style={styles.drawerGroupTitle}>{group.title}</Text>
+                    {group.data.map(c => (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[
+                          styles.drawerItem,
+                          c.id === currentConversationId && styles.drawerItemActive
+                        ]}
+                        onPress={() => selectConversation(c.id)}
+                      >
+                        <Ionicons 
+                          name="chatbubble-outline" 
+                          size={16} 
+                          color={c.id === currentConversationId ? Colors.primaryBlue : Colors.darkGray} 
+                        />
+                        <Text 
+                          style={[
+                            styles.drawerItemText,
+                            c.id === currentConversationId && styles.drawerItemTextActive
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {c.title || 'New Chat'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  const activeConversation = historyList.find(c => c.id === currentConversationId);
+  const headerTitle = activeConversation ? activeConversation.title : 'GovAssist AI';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#EBF2FF" />
 
-      <ChatHeader onBackPress={() => router.back()} onClearPress={messages.length > 0 ? handleClear : undefined} />
+      <ChatHeader 
+        onMenuPress={openDrawer}
+        onBackPress={() => router.back()} 
+        onClearPress={messages.length > 0 ? handleClear : undefined} 
+        title={headerTitle}
+      />
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -409,6 +631,7 @@ export function GovAssistChatScreen() {
           />
         </View>
       </KeyboardAvoidingView>
+      {renderDrawer()}
     </SafeAreaView>
   );
 }
@@ -497,5 +720,102 @@ const styles = StyleSheet.create({
   chipsScroll: {
     paddingHorizontal: Spacing.md,
     alignItems: 'center',
+  },
+  drawerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    elevation: 1000,
+    flexDirection: 'row',
+  },
+  drawerBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
+  },
+  drawerContainer: {
+    width: DRAWER_WIDTH,
+    height: '100%',
+    backgroundColor: '#F9FAFB',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  drawerSafeArea: {
+    flex: 1,
+  },
+  drawerHeader: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  drawerTitle: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: Typography.weights.bold,
+    color: Colors.pureBlack,
+    marginBottom: Spacing.sm,
+  },
+  newChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryBlue,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: Radius.md,
+    justifyContent: 'center',
+  },
+  newChatText: {
+    color: '#FFF',
+    fontWeight: Typography.weights.semibold,
+    marginLeft: 6,
+  },
+  drawerScroll: {
+    flex: 1,
+  },
+  drawerGroup: {
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  drawerGroupTitle: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: Typography.weights.bold,
+    color: Colors.darkGray,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: Radius.sm,
+    marginBottom: 4,
+  },
+  drawerItemActive: {
+    backgroundColor: '#EBF2FF',
+  },
+  drawerItemText: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.pureBlack,
+    marginLeft: 8,
+    flex: 1,
+  },
+  drawerItemTextActive: {
+    color: Colors.primaryBlue,
+    fontWeight: Typography.weights.semibold,
   },
 });

@@ -136,6 +136,8 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
             r"\b(upload"
             r"|add\s+(my\s+)?(aadhaar|pan|passport|document|certificate|licence|license)"
             r"|submit\s+(document|proof|certificate)"
+            r"|replace\s+(it|this|that|the\s+document)"
+            r"|upload\s+a\s+new\s+one"
             r"|attach\s+(document|file))\b",
             re.IGNORECASE,
         ),
@@ -148,9 +150,11 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
         Intent.DOCUMENT_STATUS,
         re.compile(
             r"\b(document\s+status"
-            r"|status\s+of\s+(my\s+)?document"
-            r"|is\s+my\s+document\s+(verified|approved|ready|uploaded)"
-            r"|document\s+(verified|approved|pending|rejected))\b",
+            r"|status\s+of\s+(my\s+)?(document|aadhaar|pan|passport|driving\s+licen[cs]e)"
+            r"|is\s+my\s+(document|aadhaar|pan|passport|driving\s+licen[cs]e)\s+(verified|approved|ready|uploaded)"
+            r"|(document|aadhaar|pan|passport|driving\s+licen[cs]e)\s+(verified|approved|pending|rejected)"
+            r"|(show|open|verify|get|view)\s+(my\s+)?(document|aadhaar|pan|passport|driving\s+licen[cs]e|it|this|that|its\s+details)"
+            r"|(what\s+is\s+its\s+status|show\s+its\s+details|open\s+it|verify\s+it))\b",
             re.IGNORECASE,
         ),
         1.0,
@@ -163,7 +167,10 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
         re.compile(
             r"\b(renew"
             r"|how\s+to\s+renew"
-            r"|renewal\s+(process|guide|steps?|procedure)"
+            r"|can\s+i\s+renew"
+            r"|renewal\s+(process|guide|steps?|procedure|fee|timeline|requirements?)"
+            r"|what\s+is\s+the\s+renewal\s+fee"
+            r"|how\s+many\s+days\s+before\s+expiry"
             r"|driving\s+licen(ce|se)\s+renew"
             r"|passport\s+renew"
             r"|aadhaar\s+update)\b",
@@ -171,6 +178,21 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
         ),
         1.0,
         "renewal_pattern",
+    ),
+
+    # ── SERVICE_CENTRE ────────────────────────────────────────────────────────
+    (
+        Intent.SERVICE_CENTRE,
+        re.compile(
+            r"\b(where\s+(can|do|should)\s+i\s+(renew|apply|go)"
+            r"|nearest\s+(rto|meeseva|passport\s+seva|aadhaar|center|centre)"
+            r"|nearby\s+(rto|meeseva|passport\s+seva|aadhaar|center|centre)"
+            r"|service\s+(center|centre)"
+            r"|find\s+(a\s+)?(center|centre|meeseva|rto))\b",
+            re.IGNORECASE,
+        ),
+        1.0,
+        "service_centre_pattern",
     ),
 
     # ── SCHEME_EXPLAIN ────────────────────────────────────────────────────────
@@ -201,6 +223,22 @@ _PATTERN_RULES: list[tuple[Intent, re.Pattern, float, str]] = [
         1.0,
         "app_help_pattern",
     ),
+
+    # ── GENERAL_CHAT (Conversational/Memory) ──────────────────────────────────
+    (
+        Intent.GENERAL_CHAT,
+        re.compile(
+            r"\b(what\s+did\s+i\s+(ask|say)"
+            r"|what\s+were\s+we\s+discussing"
+            r"|do\s+you\s+remember"
+            r"|continue"
+            r"|summarize\s+(our\s+)?(chat|conversation)"
+            r"|what\s+did\s+you\s+(tell|say))\b",
+            re.IGNORECASE,
+        ),
+        0.8,
+        "general_chat_pattern",
+    ),
 ]
 
 
@@ -214,6 +252,7 @@ _KEYWORD_RULES: list[tuple[Intent, frozenset, float, str]] = [
     (Intent.DOCUMENT_REMINDER,  frozenset({"expiry", "expiration", "expired", "expiring", "expires", "reminder"}),           0.75, "doc_reminder_kw"),
     (Intent.DOCUMENT_UPLOAD,    frozenset({"upload", "attach", "submit", "aadhaar", "pan", "passport"}),          0.75, "doc_upload_kw"),
     (Intent.DOCUMENT_STATUS,    frozenset({"status", "verified", "approved", "pending", "rejected"}),             0.75, "doc_status_kw"),
+    (Intent.SERVICE_CENTRE,     frozenset({"nearest", "nearby", "meeseva", "rto", "center", "centre"}),           0.75, "service_centre_kw"),
     (Intent.RENEWAL_GUIDE,      frozenset({"renew", "renewal", "update", "reissue"}),                             0.75, "renewal_kw"),
     (Intent.SCHEME_EXPLAIN,     frozenset({"scheme", "schemes", "yojana", "programme", "program", "pmegp", "mudra", "pmay", "pmkisan", "ayushman"}), 0.75, "scheme_explain_kw"),
     (Intent.APP_HELP,           frozenset({"help", "guide", "tutorial", "how", "use", "feature", "vault"}),       0.75, "app_help_kw"),
@@ -313,7 +352,7 @@ def _has_vaultgov_signal(normalised: str) -> bool:
             return True
     return False
 
-def detect_intent(message: str) -> IntentResult:
+def detect_intent(message: str, active_context: Optional[dict] = None) -> IntentResult:
     """
     Classify the user message into an Intent using keyword/pattern matching.
 
@@ -321,6 +360,8 @@ def detect_intent(message: str) -> IntentResult:
     ----------
     message : str
         Raw user message (any casing, punctuation allowed).
+    active_context: dict
+        Active conversation context (topic, entity).
 
     Returns
     -------
@@ -334,6 +375,15 @@ def detect_intent(message: str) -> IntentResult:
 
     # PREPROCESSING
     normalised = preprocess_text(message)
+    
+    # PRONOUN RESOLUTION
+    if active_context:
+        topic = active_context.get("current_topic")
+        entity = active_context.get("current_entity")
+        if topic == "Document" and entity and entity != "None":
+            # If the user uses pronouns referencing the document, replace them
+            pronoun_pattern = re.compile(r"\b(it|this|that|the\s+document|that\s+one|the\s+first\s+one|the\s+expired\s+one|the\s+uploaded\s+one)\b", re.IGNORECASE)
+            normalised = pronoun_pattern.sub(entity.lower(), normalised)
 
     # 1. Detect if there's a greeting. We don't return immediately!
     # We want to let actionable intents like DOCUMENT_STATUS run first.

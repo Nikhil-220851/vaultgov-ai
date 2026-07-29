@@ -17,7 +17,9 @@ def _serialize_doc(doc: Any) -> Dict[str, Any]:
         "id": str(doc.id),
         "title": doc.title,
         "subtitle": doc.subtitle,
-        "expiry_text": doc.expiry_text,
+        "expiry_text": getattr(doc, 'expiry_text', None),
+        "status": getattr(doc, 'status', None),
+        "expiry_date": doc.expiry_date.isoformat() if getattr(doc, 'expiry_date', None) else None,
         "category": doc.category,
         "visual_state": doc.visual_state,
         "icon_name": doc.icon_name,
@@ -109,7 +111,16 @@ def build_response(
             docs = rem_res.get("documents", [])
             doc_lines = []
             for doc in docs:
-                expiry_info = f" ({doc.expiry_text})" if doc.expiry_text else ""
+                status = getattr(doc, 'status', None)
+                expiry_date = getattr(doc, 'expiry_date', None)
+                
+                if status == "EXPIRED" and expiry_date:
+                    expiry_info = f" (Expired on {expiry_date.strftime('%b %d, %Y')})"
+                elif status == "EXPIRING_SOON" and expiry_date:
+                    expiry_info = f" (Expiring on {expiry_date.strftime('%b %d, %Y')})"
+                else:
+                    expiry_info = f" ({getattr(doc, 'expiry_text', '')})" if getattr(doc, 'expiry_text', None) else ""
+                    
                 doc_lines.append(f"- {doc.title}{expiry_info}")
             
             message = "The following documents require renewal or action:\n" + "\n".join(doc_lines)
@@ -313,6 +324,59 @@ def build_response(
             "How can I assist you today?"
         )
 
+    # 8. RENEWAL_GUIDE
+    elif intent == Intent.RENEWAL_GUIDE:
+        active_doc = resolver_data.get("active_document_context")
+        metadata["renewal_guide"] = {}
+        if active_doc:
+            message = f"Here is the renewal information for your {active_doc.get('title', 'document')}."
+            metadata["renewal_guide"]["active_document"] = active_doc
+        else:
+            message = "Here is the general renewal information for your document."
+
+    # 9. SCHEME_EXPLAIN & SCHEME_COMPARE
+    elif intent in (Intent.SCHEME_EXPLAIN, Intent.SCHEME_COMPARE):
+        active_scheme = resolver_data.get("active_scheme_context")
+        metadata["scheme_info"] = {}
+        if active_scheme:
+            message = f"Here is the detailed information for {active_scheme.get('title', 'the scheme')}."
+            metadata["scheme_info"]["active_scheme"] = active_scheme
+        else:
+            message = "Here is the scheme information."
+
+    # 10. REQUIRED_DOCUMENTS
+    elif intent == Intent.REQUIRED_DOCUMENTS:
+        active_doc = resolver_data.get("active_document_context")
+        active_scheme = resolver_data.get("active_scheme_context")
+        metadata["required_docs"] = {}
+        if active_scheme:
+            message = f"Here are the required documents for applying to {active_scheme.get('title', 'the scheme')}."
+            metadata["required_docs"]["active_scheme"] = active_scheme
+        elif active_doc:
+            message = f"Here are the required documents for renewing your {active_doc.get('title', 'document')}."
+            metadata["required_docs"]["active_document"] = active_doc
+        else:
+            message = "Here are the required documents."
+
+    # 11. SERVICE_CENTRE
+    elif intent == Intent.SERVICE_CENTRE:
+        active_doc = resolver_data.get("active_document_context")
+        active_scheme = resolver_data.get("active_scheme_context")
+        profile = resolver_data.get("profile", {})
+        user = profile.get("user")
+        
+        metadata["service_centre"] = {}
+        if active_doc:
+            metadata["service_centre"]["active_document"] = active_doc
+        if active_scheme:
+            metadata["service_centre"]["active_scheme"] = active_scheme
+            
+        if user and user.district:
+            message = f"I am locating the nearest official service centre in {user.district}, {user.state}."
+            metadata["service_centre"]["location"] = {"district": user.district, "state": user.state}
+        else:
+            message = "Please share your city or district so I can find the nearest service centre."
+
     # 8. Unsupported / Fallback
     else:
         message = (
@@ -327,7 +391,7 @@ def build_response(
     quick_replies = QuickReplyBuilder.build(intent, metadata)
 
     return ChatResponse(
-        message=message,
+        message="",
         intent=intent,
         confidence=confidence,
         actions=actions,

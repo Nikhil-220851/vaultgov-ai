@@ -5,19 +5,24 @@ from datetime import datetime, timezone
 
 class MemoryManager:
     """
-    Singleton-like manager to manage in-memory conversation history per user.
+    Singleton-like manager to manage in-memory conversation history per conversation.
     """
     _store: Dict[str, ConversationMemory] = {}
     
     @classmethod
-    def _get_memory(cls, uid: str) -> ConversationMemory:
-        if uid not in cls._store:
-            cls._store[uid] = ConversationMemory(maxlen=10)
-        return cls._store[uid]
+    def _get_key(cls, uid: str, conversation_id: str) -> str:
+        return f"{uid}_{conversation_id}"
 
     @classmethod
-    def add_user_message(cls, uid: str, message: str, intent: str, backend_context: Dict[str, Any]):
-        memory = cls._get_memory(uid)
+    def _get_memory(cls, uid: str, conversation_id: str) -> ConversationMemory:
+        key = cls._get_key(uid, conversation_id)
+        if key not in cls._store:
+            cls._store[key] = ConversationMemory(maxlen=10)
+        return cls._store[key]
+
+    @classmethod
+    def add_user_message(cls, uid: str, conversation_id: str, message: str, intent: str, backend_context: Dict[str, Any]):
+        memory = cls._get_memory(uid, conversation_id)
         turn: UserTurn = {
             "role": "user",
             "message": message,
@@ -28,8 +33,8 @@ class MemoryManager:
         memory.add_turn(turn)
 
     @classmethod
-    def add_assistant_message(cls, uid: str, message: str, intent: str, backend_context: Dict[str, Any]):
-        memory = cls._get_memory(uid)
+    def add_assistant_message(cls, uid: str, conversation_id: str, message: str, intent: str, backend_context: Dict[str, Any]):
+        memory = cls._get_memory(uid, conversation_id)
         turn: AssistantTurn = {
             "role": "assistant",
             "message": message,
@@ -39,17 +44,22 @@ class MemoryManager:
         memory.add_turn(turn)
         
     @classmethod
-    def get_recent_history(cls, uid: str) -> List[Union[UserTurn, AssistantTurn]]:
-        if uid not in cls._store:
+    def get_recent_history(cls, uid: str, conversation_id: str, memory_enabled: bool = True) -> List[Union[UserTurn, AssistantTurn]]:
+        if not memory_enabled:
             return []
-        return cls._store[uid].get_history()
+        key = cls._get_key(uid, conversation_id)
+        if key not in cls._store:
+            return []
+        return cls._store[key].get_history()
         
     @classmethod
-    def clear(cls, uid: str):
-        if uid in cls._store:
-            cls._store[uid].clear()
+    def clear(cls, uid: str, conversation_id: str):
+        key = cls._get_key(uid, conversation_id)
+        if key in cls._store:
+            cls._store[key].clear()
             
     @classmethod
-    def trim(cls, uid: str):
-        if uid in cls._store:
-            cls._store[uid].trim()
+    def trim(cls, uid: str, conversation_id: str):
+        key = cls._get_key(uid, conversation_id)
+        if key in cls._store:
+            cls._store[key].trim()

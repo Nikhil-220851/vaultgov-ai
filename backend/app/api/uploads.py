@@ -19,7 +19,7 @@ Tesseract path is resolved in priority order:
   2. System PATH (shutil.which)
   3. Hardcoded Windows default
 """
-
+import pytesseract
 import io
 import os
 import shutil
@@ -29,6 +29,10 @@ import traceback
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
 from app.services import cloudinary_service
 
+pytesseract.pytesseract.tesseract_cmd = os.getenv(
+    "TESSERACT_CMD",
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+)
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"]
@@ -147,11 +151,27 @@ async def upload_image(file: UploadFile = File(...)):
         print(f"PIL Image open FAILED: {type(e).__name__}: {e}")
         traceback.print_exc()
         print("=======================================")
-        return _build_response(res, ocr_text, doc_type, structured_data, document_intelligence_success)
+        return _build_response(res, ocr_text, doc_type, "Unknown", "Unknown", structured_data, document_intelligence_success)
 
     # ── Step 3b: Tesseract OCR ────────────────────────────────────────────────
     try:
-        pytesseract.pytesseract.tesseract_cmd = _TESSERACT_CMD
+        tess_cmd = pytesseract.pytesseract.tesseract_cmd
+        print(f"[OCR] Configured executable: {tess_cmd}")
+        exists = os.path.isfile(tess_cmd)
+        print(f"[OCR] Executable exists: {exists}")
+        
+        if not exists:
+            return {
+                "success": False,
+                "message": "Tesseract OCR is not installed or configured.",
+                "details": "Executable not found."
+            }
+            
+        try:
+            print(f"[OCR] Tesseract version: {pytesseract.get_tesseract_version()}")
+        except Exception as v_err:
+            print(f"[OCR] Could not fetch version: {v_err}")
+
         print("OCR started")
         t_ocr_start = time.time()
         ocr_text = pytesseract.image_to_string(image)
@@ -163,7 +183,11 @@ async def upload_image(file: UploadFile = File(...)):
         print(f"OCR FAILED [{type(e).__name__}]: {e}")
         traceback.print_exc()
         print("=======================================")
-        return _build_response(res, ocr_text, doc_type, structured_data, document_intelligence_success)
+        return {
+            "success": False,
+            "message": "OCR engine is unavailable.",
+            "error": "Tesseract is not installed." if "tesseract is not installed" in str(e).lower() else str(e)
+        }
 
     # ── Step 3c: Template detection ────────────────────────────────────────────
     print("Running TemplateMatcher...")

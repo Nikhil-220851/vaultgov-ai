@@ -47,10 +47,82 @@ class QuickReplyBuilder:
                         reply.enabled = False
                 baseline_replies.append(make_upload_document())
 
-        # 3. Filter by enabled
+        # 3. Add dynamic document context replies
+        active_doc = metadata.get("active_document_context")
+        if active_doc or intent in (Intent.DOCUMENT_STATUS, Intent.RENEWAL_GUIDE, Intent.DOCUMENT_REMINDER, Intent.DOCUMENT_UPLOAD):
+            baseline_replies.extend([
+                InternalQuickReply(
+                    id="renewal_steps",
+                    label="Renewal Steps",
+                    message="How do I renew it?",
+                    priority=5
+                ),
+                InternalQuickReply(
+                    id="required_docs",
+                    label="Required Documents",
+                    message="What documents do I need?",
+                    priority=6
+                ),
+                InternalQuickReply(
+                    id="nearest_rto",
+                    label="Nearest RTO",
+                    message="Where is the nearest RTO?",
+                    priority=7
+                ),
+                InternalQuickReply(
+                    id="renewal_fee",
+                    label="Renewal Fee",
+                    message="What is the renewal fee?",
+                    priority=8
+                ),
+                InternalQuickReply(
+                    id="official_website",
+                    label="Official Website",
+                    message="What is the official website?",
+                    priority=9
+                )
+            ])
+
+        # 3.5 Add dynamic scheme context replies
+        active_scheme = metadata.get("active_scheme_context")
+        if active_scheme or intent in (Intent.ACTIVE_SCHEMES, Intent.SCHEME_EXPLAIN, Intent.SCHEME_COMPARE):
+            baseline_replies.extend([
+                InternalQuickReply(
+                    id="eligibility",
+                    label="Eligibility",
+                    message="Am I eligible?",
+                    priority=5
+                ),
+                InternalQuickReply(
+                    id="apply_now",
+                    label="Apply Now",
+                    message="How do I apply?",
+                    priority=6
+                ),
+                InternalQuickReply(
+                    id="scheme_docs",
+                    label="Required Documents",
+                    message="What documents are required?",
+                    priority=7
+                ),
+                InternalQuickReply(
+                    id="nearest_meeseva",
+                    label="Nearest MeeSeva",
+                    message="Where is the nearest MeeSeva?",
+                    priority=8
+                ),
+                InternalQuickReply(
+                    id="benefits",
+                    label="Benefits",
+                    message="What are the benefits?",
+                    priority=9
+                )
+            ])
+
+        # 4. Filter by enabled
         enabled_replies = [r for r in baseline_replies if r.enabled]
 
-        # 4. Deduplicate based on id while preserving order of first appearance
+        # 5. Deduplicate based on id while preserving order of first appearance
         seen_ids = set()
         deduped_replies: List[InternalQuickReply] = []
         for reply in enabled_replies:
@@ -58,9 +130,9 @@ class QuickReplyBuilder:
                 deduped_replies.append(reply)
                 seen_ids.add(reply.id)
 
-        # 5. Sort replies by priority (lower number = higher priority)
+        # 6. Sort replies by priority (lower number = higher priority)
         deduped_replies.sort(key=lambda r: r.priority)
 
-        # 6. Cap at MAX_QUICK_REPLIES and convert to external model
+        # 7. Cap at MAX_QUICK_REPLIES and convert to external model
         final_replies = deduped_replies[:MAX_QUICK_REPLIES]
         return [reply.to_quick_reply() for reply in final_replies]

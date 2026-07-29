@@ -20,6 +20,8 @@ from app.schemas.user import (
     UserPermissionsUpdate,
     UserProfileUpdate,
     UserResponse,
+    UserAIPreferencesUpdate,
+    UserAIPreferencesResponse,
 )
 from app.services import user_service, document_service
 from app.copilot.eligibility_engine import (
@@ -162,7 +164,78 @@ def update_permissions(
     return UserResponse.model_validate(user)
 
 
-# ─── GET /users/:firebase_uid/eligibility — Batch evaluate all schemes ────────
+# ─── GET /users/:firebase_uid/ai-settings — Get AI Settings ──────────────
+
+@router.get("/{firebase_uid}/ai-settings", response_model=UserAIPreferencesResponse)
+def get_ai_settings(
+    firebase_uid: str,
+    db: Session = Depends(get_db),
+    current_uid: str = Depends(get_current_uid),
+) -> UserAIPreferencesResponse:
+    _assert_owns_record(current_uid, firebase_uid)
+
+    from app.models.user_preferences import UserAIPreferences
+    
+    prefs = db.query(UserAIPreferences).filter_by(user_id=firebase_uid).first()
+    if not prefs:
+        prefs = UserAIPreferences(user_id=firebase_uid)
+        db.add(prefs)
+        db.commit()
+        db.refresh(prefs)
+        
+    return UserAIPreferencesResponse.model_validate(prefs)
+
+
+# ─── PUT /users/:firebase_uid/ai-settings — Update AI Settings ──────────────
+
+@router.put("/{firebase_uid}/ai-settings", response_model=UserAIPreferencesResponse)
+def update_ai_settings(
+    firebase_uid: str,
+    body: UserAIPreferencesUpdate,
+    db: Session = Depends(get_db),
+    current_uid: str = Depends(get_current_uid),
+) -> UserAIPreferencesResponse:
+    _assert_owns_record(current_uid, firebase_uid)
+
+    from app.models.user_preferences import UserAIPreferences
+    
+    prefs = db.query(UserAIPreferences).filter_by(user_id=firebase_uid).first()
+    if not prefs:
+        prefs = UserAIPreferences(user_id=firebase_uid)
+        db.add(prefs)
+        
+    prefs.memory_enabled = body.memory_enabled
+    prefs.detailed_responses = body.detailed_responses
+    db.commit()
+    db.refresh(prefs)
+        
+    return UserAIPreferencesResponse.model_validate(prefs)
+
+
+# ─── DELETE /users/:firebase_uid/ai-settings — Reset AI Settings ────────────
+
+@router.delete("/{firebase_uid}/ai-settings", response_model=UserAIPreferencesResponse)
+def reset_ai_settings(
+    firebase_uid: str,
+    db: Session = Depends(get_db),
+    current_uid: str = Depends(get_current_uid),
+) -> UserAIPreferencesResponse:
+    _assert_owns_record(current_uid, firebase_uid)
+
+    from app.models.user_preferences import UserAIPreferences
+    
+    prefs = db.query(UserAIPreferences).filter_by(user_id=firebase_uid).first()
+    if not prefs:
+        prefs = UserAIPreferences(user_id=firebase_uid)
+        db.add(prefs)
+        
+    prefs.memory_enabled = True
+    prefs.detailed_responses = True
+    db.commit()
+    db.refresh(prefs)
+        
+    return UserAIPreferencesResponse.model_validate(prefs)
+
 
 
 @router.get("/{firebase_uid}/eligibility", response_model=Dict[str, Any])

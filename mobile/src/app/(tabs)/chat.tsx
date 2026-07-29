@@ -1,3 +1,3 @@
-import ConversationListScreen from '@/screens/ConversationListScreen';
+import { GovAssistChatScreen } from '@/screens/GovAssistChatScreen';
 
-export default ConversationListScreen;
+export default GovAssistChatScreen;

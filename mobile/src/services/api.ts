@@ -13,6 +13,7 @@
 
 import { API_BASE_URL, API_TIMEOUT_MS, API_PDF_TIMEOUT_MS, API_IMAGE_TIMEOUT_MS, API_MAX_RETRIES } from '@/config/api.config';
 import { File } from 'expo-file-system';
+import { auth } from '@/services/firebase';
 
 // ─── Error Types ──────────────────────────────────────────────────────────────
 
@@ -318,6 +319,20 @@ async function fetchWithRetry<T>(
   const requestId = reqId || generateRequestId();
   let lastError: Error = new Error('Unknown error');
 
+  // 1) Proactively check for token freshness before starting the fetch
+  if (auth.currentUser) {
+    try {
+      const freshToken = await auth.currentUser.getIdToken();
+      _authToken = freshToken; // update local cache
+      options.headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${freshToken}`,
+      };
+    } catch (e) {
+      console.warn(`[API] [${requestId}] Failed to get fresh ID token before request:`, e);
+    }
+  }
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
       console.log(`[RETRY] [${requestId}] Attempt ${attempt + 1}/${maxRetries + 1}`);
@@ -331,6 +346,25 @@ async function fetchWithRetry<T>(
     } catch (err: any) {
       lastError = err;
       
+      // 2) Handle 401 Unauthorized forced token refresh
+      if (err instanceof ApiError && err.status === 401 && auth.currentUser) {
+        console.log(`[AUTH] [${requestId}] 401 received, forcing token refresh...`);
+        try {
+          const forceRefreshedToken = await auth.currentUser.getIdToken(true);
+          _authToken = forceRefreshedToken;
+          options.headers = {
+            ...options.headers,
+            'Authorization': `Bearer ${forceRefreshedToken}`,
+          };
+          console.log(`[AUTH] [${requestId}] Token force refreshed successfully. Retrying once...`);
+          // Retry exactly once after forced refresh
+          return await fetchAndParse<T>(url, options, timeoutMs, requestId);
+        } catch (refreshErr) {
+          console.error(`[AUTH] [${requestId}] Failed to force refresh token:`, refreshErr);
+          throw err; // throw original 401 if refresh fails
+        }
+      }
+
       // Do not retry on client deterministic errors (4xx)
       if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
         throw err;

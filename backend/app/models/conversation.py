@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, func
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, func, Boolean
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
@@ -13,6 +13,7 @@ class Conversation(Base):
     user_id = Column(String, index=True, nullable=False)  # Link to user
     created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now())
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False, server_default=func.now())
+    is_deleted = Column(Boolean, default=False, nullable=False)
 
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
 

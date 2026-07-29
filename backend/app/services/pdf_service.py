@@ -7,7 +7,10 @@ import sys
 import traceback
 import time
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = os.getenv(
+    "TESSERACT_CMD", 
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+)
 
 print("===================================")
 print("PDF SERVICE LOADED")

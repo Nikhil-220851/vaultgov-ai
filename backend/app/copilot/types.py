@@ -60,9 +60,11 @@ class Intent(str, Enum):
     APP_HELP           = "app_help"
     GREETING           = "greeting"
     UNSUPPORTED        = "unsupported"
+    GENERAL_CHAT       = "general_chat"
     ACTIVE_SCHEMES     = "active_schemes"
     PROFILE_SUMMARY    = "profile_summary"
     APPLICATION_STATISTICS = "application_statistics"
+    SERVICE_CENTRE     = "service_centre"
 
 
 # ── Request ───────────────────────────────────────────────────────────────────
