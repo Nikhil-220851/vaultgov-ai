@@ -1,5 +1,5 @@
 "use no memo";
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,123 +7,112 @@ import {
   ScrollView,
   StatusBar,
   Alert,
-  Platform,
-  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
+import { Ionicons } from '@expo/vector-icons';
 
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
-import { InformationCard } from '@/components/profile/InformationCard';
-import { SettingsCard } from '@/components/profile/SettingsCard';
-import { LinkedServicesCard } from '@/components/profile/LinkedServicesCard';
-import { DocumentHealthCard } from '@/components/profile/DocumentHealthCard';
-import { SignOutCard } from '@/components/profile/SignOutCard';
+import { SummaryCard } from '@/components/profile/SummaryCard';
+import { SettingsSection } from '@/components/profile/SettingsSection';
+import { SettingsRow } from '@/components/profile/SettingsRow';
+import { LogoutButton } from '@/components/profile/LogoutButton';
+import {
+  ProfileHeaderSkeleton,
+  SummaryCardSkeleton,
+  SettingsSectionSkeleton,
+} from '@/components/profile/ProfileSkeletons';
 import { Colors, Spacing, Typography, Radius } from '@/theme';
 import { useUser } from '@/context/UserContext';
-
-const ACCOUNT_SETTINGS = [
-  { id: 'privacy', icon: 'lock-closed-outline' as const, label: 'Privacy & Security', description: 'Manage PIN, biometric & data' },
-  { id: 'notifications', icon: 'notifications-outline' as const, label: 'Notifications', description: 'Scheme alerts, document expiry', badge: 'On' },
-  { id: 'language', icon: 'language-outline' as const, label: 'Language', description: 'Currently: English' },
-  { id: 'accessibility', icon: 'eye-outline' as const, label: 'Accessibility', description: 'Text size and display options' },
-  { id: 'help', icon: 'help-circle-outline' as const, label: 'Help & Support', description: 'FAQs, contact us, feedback' },
-  { id: 'about', icon: 'information-circle-outline' as const, label: 'About VaultGov', description: 'Version 1.0.0 · Legal & Privacy' },
-];
-
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <View style={sectionStyles.header}>
-      <Text style={sectionStyles.title}>{title}</Text>
-    </View>
-  );
-}
-
-const sectionStyles = StyleSheet.create({
-  header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.sm,
-  },
-  title: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.bold,
-    color: Colors.primaryBlue,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-});
-
-function SectionCard({ children }: { children: React.ReactNode }) {
-  return <View style={cardWrapStyles.card}>{children}</View>;
-}
-
-const cardWrapStyles = StyleSheet.create({
-  card: {
-    marginHorizontal: Spacing.md,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: '#EBEBEB',
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-      },
-      android: { elevation: 2 },
-    }),
-  },
-});
+import { useStatsStore } from '@/store/useStatsStore';
+import { useDocumentStore } from '@/features/documents/store/useDocumentStore';
 
 export function ProfileScreen() {
   const router = useRouter();
-  const { user, isLoading, signOut } = useUser();
+  const { user, isLoading: isUserLoading, signOut, refetchUser } = useUser();
+  const { stats, isLoading: isStatsLoading, fetchStats } = useStatsStore();
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Initial fetch of stats if not available
+  useEffect(() => {
+    if (!stats) {
+      fetchStats().catch((err) => {
+        setError('Failed to load profile data.');
+      });
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setError(null);
+    try {
+      await Promise.all([refetchUser(), fetchStats()]);
+    } catch (err) {
+      setError('Unable to load profile. Pull down to retry.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchUser, fetchStats]);
 
   const handleSignOut = async () => {
     try {
       console.log('[ProfileScreen] User initiating sign out...');
       await signOut();
+      useStatsStore.setState({ stats: null, isLoading: true });
+      try {
+        useDocumentStore.setState({ documents: [], isHydrating: true });
+      } catch (e) {
+        // Ignored if document store not initialized
+      }
       router.replace('/login' as any);
       console.log('Navigation Redirected');
-    } catch (error) {
-      console.error('[ProfileScreen] Sign out failed:', error);
+    } catch (err) {
+      console.error('[ProfileScreen] Sign out failed:', err);
       Alert.alert('Error', 'Failed to sign out. Please try again.');
     }
   };
 
-  const handleSettingPress = (id: string) => {
-    Alert.alert('Coming Soon', `The "${id}" section is coming in the next update.`);
+  const handleNavigation = (route: string) => {
+    if (route === 'My Documents') {
+      router.push('/(tabs)/docs' as any);
+    } else if (route === 'Saved Schemes') {
+      // TODO: Replace with actual saved schemes route when available
+      Alert.alert('Coming Soon', 'Saved Schemes navigation is coming soon.');
+    } else {
+      Alert.alert('Coming Soon', `The "${route}" section is coming in the next update.`);
+    }
   };
 
-  if (isLoading) {
+  // Loading state handling with Skeletons
+  const showSkeletons = isUserLoading || (isStatsLoading && !stats);
+
+  if (showSkeletons && !refreshing) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primaryBlue} />
-        <Text style={styles.loadingText}>Loading profile...</Text>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#EBF2FF" />
+        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+          <ProfileHeaderSkeleton />
+          <SummaryCardSkeleton />
+          <SettingsSectionSkeleton />
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
-  // Parse initials from name
   const name = user?.full_name || 'Citizen User';
   const phone = user?.mobile_number || 'Not Linked';
-  const email = user?.email || 'Not Linked';
+  const email = user?.email || undefined;
   const avatarInitials = name.trim().charAt(0).toUpperCase();
 
-  const personalInfo = [
-    { id: 'aadhaar', icon: 'finger-print-outline' as const, label: 'Aadhaar Status', value: user?.aadhaar_verified ? 'Verified' : 'Not Verified', isVerified: !!user?.aadhaar_verified },
-    { id: 'dob', icon: 'calendar-outline' as const, label: 'Date of Birth', value: user?.date_of_birth || 'Not Provided', isVerified: false },
-    { id: 'gender', icon: 'person-outline' as const, label: 'Gender', value: user?.gender || 'Not Provided', isVerified: false },
-    { id: 'state', icon: 'location-outline' as const, label: 'State', value: user?.state || 'Not Provided', isVerified: false },
-    { id: 'district', icon: 'map-outline' as const, label: 'District', value: user?.district || 'Not Provided', isVerified: false },
-    { id: 'email', icon: 'mail-outline' as const, label: 'Email Address', value: email, isVerified: false },
-    { id: 'mobile', icon: 'call-outline' as const, label: 'Mobile Number', value: phone, isVerified: true },
-    { id: 'occupation', icon: 'briefcase-outline' as const, label: 'Occupation', value: user?.occupation || 'Not Provided', isVerified: false },
-    { id: 'income', icon: 'cash-outline' as const, label: 'Income Category', value: user?.annual_income ? `${user.annual_income} Slab` : 'Not Provided', isVerified: false },
-  ];
+  const memberSinceYear = user?.created_at
+    ? new Date(user.created_at).getFullYear()
+    : new Date().getFullYear();
+
+  const appVersion = Constants.expoConfig?.version || '1.0.0';
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -133,72 +122,63 @@ export function ProfileScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.primaryBlue]}
+            tintColor={Colors.primaryBlue}
+          />
+        }
       >
-        {/* ─── Header ──────────────────────────────────────────────────── */}
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="cloud-offline-outline" size={32} color={Colors.darkGray} />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         <ProfileHeader
           name={name}
           phone={phone}
+          email={email}
           avatarInitials={avatarInitials}
           isVerified={!!user?.aadhaar_verified}
-          onEditPress={() => handleSettingPress('edit profile')}
         />
 
-        {/* ─── Personal Information ─────────────────────────────────── */}
-        <SectionHeader title="Personal Information" />
-        <SectionCard>
-          {personalInfo.map((item) => (
-            <InformationCard
-              key={item.id}
-              icon={item.icon}
-              label={item.label}
-              value={item.value}
-              isVerified={item.isVerified}
-              onPress={() => handleSettingPress(item.label)}
-            />
-          ))}
-        </SectionCard>
+        <SummaryCard
+          documentsStored={stats?.total_documents || 0}
+          savedSchemes={0} // TODO: Connect to backend saved schemes endpoint when ready
+          expiringSoon={stats?.expiring_soon || 0}
+          memberSinceYear={memberSinceYear}
+        />
 
-        {/* ─── Document Health Score ────────────────────────────────── */}
-        <SectionHeader title="Document Health Score" />
-        <SectionCard>
-          <DocumentHealthCard
-            score={78}
-            total={100}
-            expired={1}
-            expiringSoon={2}
-            verified={9}
-          />
-        </SectionCard>
+        <SettingsSection title="Vault Section">
+          <SettingsRow icon="document-text-outline" title="My Documents" subtitle="View and manage stored files" onPress={() => handleNavigation('My Documents')} />
+          <SettingsRow icon="bookmark-outline" title="Saved Schemes" subtitle="Schemes you have bookmarked" onPress={() => handleNavigation('Saved Schemes')} />
+          <SettingsRow icon="notifications-outline" title="Notification Settings" subtitle="Alerts and reminders" onPress={() => handleNavigation('Notification Settings')} />
+          <SettingsRow icon="options-outline" title="AI Preferences" subtitle="Customize AI recommendations" onPress={() => handleNavigation('AI Preferences')} isLast />
+        </SettingsSection>
 
-        {/* ─── Linked Government Services ──────────────────────────── */}
-        <SectionHeader title="Linked Government Services" />
-        <SectionCard>
-          <LinkedServicesCard />
-        </SectionCard>
+        <SettingsSection title="Security Section">
+          <SettingsRow icon="lock-closed-outline" title="Privacy Policy" onPress={() => handleNavigation('Privacy Policy')} />
+          <SettingsRow icon="document-outline" title="Terms & Conditions" onPress={() => handleNavigation('Terms & Conditions')} />
+          <SettingsRow icon="shield-checkmark-outline" title="Permissions" subtitle="Manage app access" onPress={() => handleNavigation('Permissions')} />
+          <SettingsRow icon="trash-outline" title="Delete Account" destructive onPress={() => handleNavigation('Delete Account')} isLast />
+        </SettingsSection>
 
-        {/* ─── Account & Settings ──────────────────────────────────── */}
-        <SectionHeader title="Account & Settings" />
-        <SectionCard>
-          {ACCOUNT_SETTINGS.map((item, index) => (
-            <SettingsCard
-              key={item.id}
-              icon={item.icon}
-              label={item.label}
-              description={item.description}
-              badge={'badge' in item ? item.badge : undefined}
-              isLast={index === ACCOUNT_SETTINGS.length - 1}
-              onPress={() => handleSettingPress(item.label)}
-            />
-          ))}
-        </SectionCard>
+        <SettingsSection title="Support Section">
+          <SettingsRow icon="help-circle-outline" title="Help Center" onPress={() => handleNavigation('Help Center')} />
+          <SettingsRow icon="mail-outline" title="Contact Support" onPress={() => handleNavigation('Contact Support')} />
+          <SettingsRow icon="chatbox-ellipses-outline" title="Feedback" onPress={() => handleNavigation('Feedback')} />
+          <SettingsRow icon="information-circle-outline" title="About VaultGov AI" onPress={() => handleNavigation('About VaultGov AI')} />
+          <SettingsRow icon="phone-portrait-outline" title="App Version" subtitle={`v${appVersion}`} onPress={() => {}} isLast />
+        </SettingsSection>
 
-        {/* ─── Sign Out ─────────────────────────────────────────────── */}
-        <View style={styles.signOutWrap}>
-          <SignOutCard onSignOut={handleSignOut} />
-        </View>
-
-        {/* App Version */}
-        <Text style={styles.version}>VaultGov AI · v1.0.0 · Made in India 🇮🇳</Text>
+        <LogoutButton onSignOut={handleSignOut} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -214,30 +194,36 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: Spacing.xl,
   },
-  signOutWrap: {
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  version: {
-    textAlign: 'center',
-    fontSize: Typography.sizes.xs,
-    color: Colors.darkGray,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.sm,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  errorContainer: {
+    padding: Spacing.lg,
     alignItems: 'center',
-    backgroundColor: Colors.background,
-  },
-  loadingText: {
+    justifyContent: 'center',
+    backgroundColor: '#FFF0F0',
+    marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.dangerRed + '40',
+  },
+  errorText: {
+    marginTop: Spacing.sm,
     fontSize: Typography.sizes.sm,
     color: Colors.darkGray,
-    fontFamily: Typography.fontFamilies.sans,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: Spacing.md,
+    backgroundColor: Colors.primaryBlue,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 8,
+    borderRadius: Radius.button,
+  },
+  retryBtnText: {
+    color: Colors.white,
+    fontWeight: Typography.weights.semibold,
+    fontSize: Typography.sizes.sm,
   },
 });
 

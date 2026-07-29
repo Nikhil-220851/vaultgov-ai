@@ -76,13 +76,15 @@ async def upload_pdf(
         if doc_type != "unknown":
             try:
                 print(f"Detected template:\n{doc_type} (Score: {match_result['confidence_score']}%)\nBuilding prompt...\nCalling Gemini...")
-                from app.services.document_intelligence.service import DocumentIntelligenceService
+                from app.services.document_intelligence import DocumentIntelligenceService
+                from app.services.document_intelligence.models import ExtractionRequest
                 di_service = DocumentIntelligenceService()
                 
-                result = di_service.extract(
+                request = ExtractionRequest(
                     document_type=doc_type,
                     raw_ocr_text=text
                 )
+                result = await di_service.extract(request)
                 structured_data = result.model_dump()
                 document_intelligence_success = True
                 confidence = result.overall_confidence

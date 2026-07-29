@@ -1,5 +1,5 @@
 "use no memo";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,18 +17,30 @@ interface ProfileHeaderProps {
   email?: string;
   avatarInitials: string;
   isVerified: boolean;
-  onEditPress: () => void;
-  onSettingsPress: () => void;
+  onEditPress?: () => void;
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning ☀️';
+  if (hour < 18) return 'Good Afternoon 🌤️';
+  return 'Good Evening 🌙';
 }
 
 export function ProfileHeader({
   name,
   phone,
+  email,
   avatarInitials,
   isVerified,
   onEditPress,
-}: Omit<ProfileHeaderProps, 'onSettingsPress' | 'email'>) {
+}: ProfileHeaderProps) {
   const [editScale] = useState(() => new Animated.Value(1));
+  const [greeting, setGreeting] = useState(getGreeting());
+
+  useEffect(() => {
+    setGreeting(getGreeting());
+  }, []);
 
   const handleEditPressIn = () => {
     Animated.timing(editScale, {
@@ -48,102 +60,81 @@ export function ProfileHeader({
 
   return (
     <View style={styles.container}>
-      {/* Avatar + Info row */}
-      <View style={styles.profileRow}>
-        <View style={styles.avatarWrap}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{avatarInitials}</Text>
-          </View>
-          {isVerified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+      <Text style={styles.greeting}>{greeting}</Text>
+      <View style={styles.card}>
+        <View style={styles.profileRow}>
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{avatarInitials}</Text>
             </View>
-          )}
-        </View>
-
-        <View style={styles.infoBlock}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{name}</Text>
             {isVerified && (
-              <View style={styles.verifiedPill}>
-                <Ionicons name="shield-checkmark" size={10} color={Colors.primaryBlue} />
-                <Text style={styles.verifiedPillText}>Verified</Text>
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
               </View>
             )}
           </View>
-          <Text style={styles.phone}>{phone}</Text>
-        </View>
-      </View>
 
-      {/* Edit Profile Button */}
-      <Animated.View style={{ transform: [{ scale: editScale }] }}>
-        <TouchableOpacity
-          style={styles.editBtn}
-          onPress={onEditPress}
-          onPressIn={handleEditPressIn}
-          onPressOut={handleEditPressOut}
-          activeOpacity={1}
-        >
-          <Ionicons name="pencil-outline" size={14} color={Colors.primaryBlue} />
-          <Text style={styles.editBtnText}>Edit Profile</Text>
-        </TouchableOpacity>
-      </Animated.View>
+          <View style={styles.infoBlock}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>{name}</Text>
+              {isVerified && (
+                <View style={styles.verifiedPill}>
+                  <Ionicons name="shield-checkmark" size={10} color={Colors.primaryBlue} />
+                  <Text style={styles.verifiedPillText}>Verified</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.contactText}>{phone}</Text>
+            {email && <Text style={styles.contactText}>{email}</Text>}
+          </View>
+        </View>
+
+        {onEditPress && (
+          <Animated.View style={{ transform: [{ scale: editScale }] }}>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={onEditPress}
+              onPressIn={handleEditPressIn}
+              onPressOut={handleEditPressOut}
+              activeOpacity={1}
+            >
+              <Ionicons name="pencil-outline" size={14} color={Colors.primaryBlue} />
+              <Text style={styles.editBtnText}>Edit Profile</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#EBF2FF',
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: '#D4E2FD',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#1977F3',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-      },
-      android: { elevation: 3 },
-    }),
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  logoIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: '#D4E2FD',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    fontSize: 20,
+  greeting: {
+    fontSize: Typography.sizes.xl,
     fontWeight: Typography.weights.bold,
     color: Colors.pureBlack,
-    letterSpacing: -0.5,
+    marginBottom: Spacing.md,
   },
-  settingsBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.md,
+  card: {
     backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
     borderWidth: 1,
-    borderColor: '#D4E2FD',
+    borderColor: '#EBEBEB',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
   },
   profileRow: {
     flexDirection: 'row',
@@ -155,33 +146,22 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: Colors.primaryBlue,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    ...Platform.select({
-      ios: {
-        shadowColor: Colors.primaryBlue,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-      },
-      android: { elevation: 4 },
-    }),
   },
   avatarText: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: Typography.weights.bold,
     color: '#FFFFFF',
   },
   verifiedBadge: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
+    bottom: 0,
+    right: 0,
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -193,6 +173,7 @@ const styles = StyleSheet.create({
   },
   infoBlock: {
     flex: 1,
+    justifyContent: 'center',
   },
   nameRow: {
     flexDirection: 'row',
@@ -202,7 +183,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   name: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.lg,
     fontWeight: Typography.weights.bold,
     color: Colors.pureBlack,
     letterSpacing: -0.3,
@@ -221,27 +202,20 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
     color: Colors.primaryBlue,
   },
-  phone: {
+  contactText: {
     fontSize: Typography.sizes.sm,
     color: Colors.darkGray,
     fontWeight: Typography.weights.medium,
     marginBottom: 2,
   },
-  email: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.darkGray,
-  },
   editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: Colors.primaryBlue,
-    borderRadius: Radius.button,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    justifyContent: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: Radius.md,
+    paddingVertical: 10,
   },
   editBtnText: {
     fontSize: Typography.sizes.sm,

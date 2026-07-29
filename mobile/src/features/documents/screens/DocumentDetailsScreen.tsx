@@ -67,10 +67,13 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const isDeletingRef = React.useRef(false);
+
   // ── Fetch document directly from API ───────────────────────────────────────
   useEffect(() => {
     let isMounted = true;
     async function loadDoc() {
+      if (isDeletingRef.current) return;
       try {
         setIsLoadingDoc(true);
         // First try to find it in the store to avoid a loading flash if possible
@@ -85,18 +88,20 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
           setDocument(freshDoc);
         }
       } catch (err: any) {
+        if (isDeletingRef.current) return;
         console.error('[DocumentDetails] Failed to fetch document:', err);
         // Handle 404 when document is stale in cache
         if (err?.message?.includes('404') || err?.response?.status === 404 || err?.status === 404 || err?.name === 'ApiError') {
           useDocumentStore.getState().removeDocument(id);
           useStatsStore.getState().fetchStats();
           if (isMounted) {
+            if (isDeletingRef.current) return;
             Alert.alert('Not Found', 'This document no longer exists.');
             router.back();
           }
         }
       } finally {
-        if (isMounted) setIsLoadingDoc(false);
+        if (isMounted && !isDeletingRef.current) setIsLoadingDoc(false);
       }
     }
     
@@ -187,6 +192,7 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
           style: 'destructive',
           onPress: async () => {
             try {
+              isDeletingRef.current = true;
               setIsDeleting(true);
 
               // 1. Remove the Cloudinary image if one exists (now handled by backend)
@@ -197,23 +203,22 @@ export const DocumentDetailsScreen: React.FC<DocumentDetailsScreenProps> = ({ id
               useDocumentStore.getState().removeDocument(document.id);
 
               // 4. Update the dashboard stats and refresh document list
-              useDocumentStore.getState().fetchDocuments();
+              await useDocumentStore.getState().fetchDocuments();
               await useStatsStore.getState().fetchStats();
 
-              // 5. Show success toast/snackbar
-              if (Platform.OS === 'android') {
-                ToastAndroid.show('Document deleted successfully.', ToastAndroid.SHORT);
-              } else {
-                Alert.alert('Success', 'Document deleted successfully.');
-              }
-
-              // 6. Navigate back — the list will have already updated
+              // 5. Navigate back — the list will have already updated
               if (router.canGoBack()) {
                 router.back();
               }
+
+              // 6. Show success toast
+              if (Platform.OS === 'android') {
+                ToastAndroid.show('Document deleted successfully', ToastAndroid.SHORT);
+              }
             } catch (err) {
               console.error('[DocumentDetails] Delete error:', err);
-              Alert.alert('Delete Failed', 'Unable to delete document. Please try again.');
+              Alert.alert('Delete Failed', 'Unable to delete document.\nPlease try again.');
+              isDeletingRef.current = false;
               setIsDeleting(false);
             }
           },
