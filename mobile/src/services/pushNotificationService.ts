@@ -11,6 +11,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -104,7 +106,7 @@ export const pushNotificationService = {
             if (data.document_id) {
               router.push(`/document/${data.document_id}`);
             } else {
-              router.push('/(tabs)/vault');
+              router.push('/(tabs)/docs');
             }
             break;
           case 'SchemeDetail':
@@ -115,10 +117,10 @@ export const pushNotificationService = {
             }
             break;
           case 'Security':
-            router.push('/profile/security');
+            router.push('/(tabs)/profile');
             break;
           case 'CompleteProfile':
-            router.push('/profile/edit');
+            router.push('/edit-profile');
             break;
           default:
             router.push('/(tabs)/notifications');

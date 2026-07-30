@@ -4,7 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { UserProvider, useUser } from '@/context/UserContext';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { pushNotificationService } from '@/services/pushNotificationService';
+import { NotificationProvider } from '@/context/NotificationProvider';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 
@@ -15,26 +15,14 @@ function RootLogic() {
   const stopPolling = useNotificationStore((state) => state.stopPolling);
 
   useEffect(() => {
-    let unsubscribeNotifications: (() => void) | undefined;
-
     if (user) {
-      // User is authenticated, start notification polling and push setup
+      // User is authenticated, start notification polling
       startPolling();
-      unsubscribeNotifications = pushNotificationService.setupNotificationHandlers(router);
-      
-      // Request push token and send to backend
-      pushNotificationService.registerForPushNotificationsAsync();
     } else {
       // User is not authenticated or logged out
       stopPolling();
     }
-
-    return () => {
-      if (unsubscribeNotifications) {
-        unsubscribeNotifications();
-      }
-    };
-  }, [user, router, startPolling, stopPolling]);
+  }, [user, startPolling, stopPolling]);
 
   return <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />;
 }
@@ -48,7 +36,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <UserProvider>
-            <RootLogic />
+            <NotificationProvider>
+              <RootLogic />
+            </NotificationProvider>
           </UserProvider>
         </ThemeProvider>
       </SafeAreaProvider>

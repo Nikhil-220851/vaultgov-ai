@@ -1,12 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { auth } from '@/services/firebase';
 import { Colors } from '@/theme';
 import { CategoryFilter, CategoryType } from './components/CategoryFilter';
 import { DocumentCard } from './components/DocumentCard';
-import { DocumentSearchBar } from './components/DocumentSearchBar';
 import { AddDocumentButton } from './components/AddDocumentButton';
 import { UploadDocumentSheet } from './components/UploadDocumentSheet';
 import { useDocumentStore } from './store/useDocumentStore';
@@ -16,9 +13,13 @@ import {
 } from './upload.service';
 import { styles } from './documents.styles';
 import { AppHeader } from '@/components/AppHeader';
+import { PageContainer } from '@/components/PageContainer';
+import { SearchBar } from '@/components/SearchBar';
+import { useUser } from '@/context/UserContext';
 
 export const DocumentsScreen: React.FC = () => {
   const router = useRouter();
+  const { user: dbUser } = useUser();
   const { documents, isHydrating, fetchDocuments } = useDocumentStore();
 
   useFocusEffect(
@@ -32,13 +33,6 @@ export const DocumentsScreen: React.FC = () => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   // Prevents concurrent/duplicate document picker invocations
   const [isPickingPdf, setIsPickingPdf] = useState(false);
-
-  // Pull logged-in user details if available
-  const user = auth.currentUser;
-  const displayName = user?.displayName || user?.phoneNumber || 'User';
-  const avatarInitials = displayName
-    ? displayName.trim().charAt(0).toUpperCase()
-    : 'U';
 
   const uniqueCategories = [
     ...Array.from(new Set(documents.map(d => d.category || 'Uncategorised'))),
@@ -164,41 +158,34 @@ export const DocumentsScreen: React.FC = () => {
 
   if (isHydrating) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <PageContainer noPadding>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F7F8F5' }}>
           <ActivityIndicator size="large" color={Colors.primaryBlue} />
         </View>
-      </SafeAreaView>
+      </PageContainer>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <PageContainer noPadding>
       {/* Header */}
       <AppHeader
-        leftElement={<Text style={styles.headerTitle}>My vault</Text>}
-        rightElement={
-          <Pressable
-            accessibilityLabel="User profile avatar"
-            accessibilityRole="button"
-            onPress={handleAvatarPress}
-            style={styles.avatarPressable}
-          >
-            <View style={styles.avatarContainer}>
-              <Text style={styles.avatarText}>{avatarInitials}</Text>
-            </View>
-          </Pressable>
-        }
+        title="My vault"
+        fullName={dbUser?.full_name}
+        profileImageUrl={dbUser?.profile_image_url}
+        onPressAvatar={handleAvatarPress}
         backgroundColor="#F7F8F5"
         borderBottomColor="transparent"
       />
 
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingHorizontal: 24 }]}>
         {/* Search Bar */}
-        <DocumentSearchBar value={searchQuery} onChangeText={setSearchQuery} />
+        <View style={{ marginBottom: 16 }}>
+          <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+        </View>
 
         {/* Phase 5 Smart Sorting */}
-        <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}>
+        <View style={{ flexDirection: 'row', paddingBottom: 16, gap: 8 }}>
           {(['Recent', 'Health', 'Expiry'] as const).map((opt) => (
             <Pressable
               key={opt}
@@ -263,7 +250,7 @@ export const DocumentsScreen: React.FC = () => {
         onUploadImage={handleUploadImage}
         isPdfPickingActive={isPickingPdf}
       />
-    </SafeAreaView>
+    </PageContainer>
   );
 };
 

@@ -26,6 +26,7 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { notificationService } from '@/services/NotificationService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as crypto from 'expo-crypto';
@@ -35,7 +36,7 @@ import {
   DocumentCategory,
   ValidationResult,
   FieldValidationResult,
-} from '../types/review.types';
+} from '../../documents/types/review.types';
 import { useDocumentStore } from '@/features/documents/store/useDocumentStore';
 import { apiClient } from '@/services/api';
 import { auth } from '@/services/firebase';
@@ -88,7 +89,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
 
   const requiredFieldsFromValidation = validation
     ? Object.entries(validation.field_results)
-        .filter(([, r]) => r.status === 'Invalid' && !!(reviewModel.structuredFields ?? {}))
+        .filter(([, r]: [string, FieldValidationResult]) => r.status === 'Invalid' && !!(reviewModel.structuredFields ?? {}))
         .map(([k]) => k)
     : [];
 
@@ -103,7 +104,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
             document_type: reviewModel.documentType,
             fields: currentFields,
           });
-          setValidation(result as ValidationResult);
+          setValidation(result as unknown as ValidationResult);
         } catch (e) {
           // Validation errors are non-critical; swallow silently
         } finally {
@@ -223,7 +224,7 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
     try {
       const tags = tagsInput
         .split(',')
-        .map((t) => t.trim())
+        .map((t: string) => t.trim())
         .filter(Boolean);
 
       const userId = auth.currentUser?.uid;
@@ -262,6 +263,13 @@ export const DocumentReviewScreen: React.FC<DocumentReviewScreenProps> = ({
         tags,
         confidence_score: reviewModel.confidence || 0.9,
         supports_expiry: validation?.supports_expiry ?? false,
+      });
+
+      // Schedule local notification for success
+      notificationService.scheduleLocalNotification({
+        title: 'Document Saved',
+        body: `Your ${trimmedTitle || 'document'} has been added successfully.`,
+        data: { route: '/(tabs)/docs' }
       });
 
       setSaveStatus('Done.');

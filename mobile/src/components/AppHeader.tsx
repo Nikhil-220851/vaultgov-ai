@@ -1,8 +1,9 @@
 "use no memo";
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography } from '@/theme';
+import { Avatar } from './Avatar';
 
 interface AppHeaderProps {
   title?: string;
@@ -12,6 +13,9 @@ interface AppHeaderProps {
   rightElement?: React.ReactNode;
   backgroundColor?: string;
   borderBottomColor?: string;
+  fullName?: string | null;
+  profileImageUrl?: string | null;
+  onPressAvatar?: () => void;
 }
 
 export function AppHeader({
@@ -22,6 +26,9 @@ export function AppHeader({
   rightElement,
   backgroundColor = Colors.background,
   borderBottomColor = '#EBEBEB',
+  fullName,
+  profileImageUrl,
+  onPressAvatar,
 }: AppHeaderProps) {
   return (
     <View style={[styles.header, { backgroundColor, borderBottomColor }]}>
@@ -48,7 +55,16 @@ export function AppHeader({
       </View>
 
       <View style={styles.right}>
-        {rightElement}
+        {fullName !== undefined || profileImageUrl !== undefined ? (
+          <Avatar
+            fullName={fullName}
+            profileImageUrl={profileImageUrl}
+            size={36}
+            onPress={onPressAvatar}
+          />
+        ) : (
+          rightElement
+        )}
       </View>
     </View>
   );
@@ -56,11 +72,11 @@ export function AppHeader({
 
 const styles = StyleSheet.create({
   header: {
-    height: 58,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     borderBottomWidth: 1,
     ...Platform.select({
       ios: {
@@ -115,14 +131,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 16,
+    fontSize: Typography.sizes.section,
     fontWeight: Typography.weights.bold,
     color: Colors.pureBlack,
+    fontFamily: Typography.fontFamilies.heading,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 10,
+    fontSize: Typography.sizes.caption,
     color: Colors.darkGray,
+    fontFamily: Typography.fontFamilies.sans,
     marginTop: 1,
     textAlign: 'center',
   },

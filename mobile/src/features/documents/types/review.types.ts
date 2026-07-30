@@ -2,6 +2,8 @@
  * review.types.ts
  *
  * Canonical Unified Architecture types for Document Intelligence.
+ * Single source of truth — used by DocumentReviewScreen, OCRStatusBanner,
+ * DocumentIngestionService, and document-preview route.
  */
 
 export type DocumentCategory =
@@ -10,7 +12,17 @@ export type DocumentCategory =
   | 'Education'
   | 'Other';
 
-export type FieldValidationStatus = 'Valid' | 'Warning' | 'Invalid';
+// ─── PDF Progress Stages ──────────────────────────────────────────────────────
+
+export type PdfProgressStage =
+  | 'uploading'
+  | 'extracting'
+  | 'analyzing'
+  | 'preparing';
+
+// ─── Validation ───────────────────────────────────────────────────────────────
+
+export type FieldValidationStatus = 'Valid' | 'Warning' | 'Invalid' | 'Missing';
 
 export interface FieldValidationResult {
   status: FieldValidationStatus;
@@ -18,13 +30,18 @@ export interface FieldValidationResult {
 }
 
 export interface ValidationResult {
+  /** Overall validation score 0–100 */
   score: number;
+  /** Whether the overall document is considered valid */
+  is_valid: boolean;
   overall_status: 'Valid' | 'Warning' | 'Invalid' | 'Error';
   field_results: Record<string, FieldValidationResult>;
   /** Required fields from the template — provided by the backend ValidationEngine */
   required_fields: string[];
   supports_expiry?: boolean;
 }
+
+// ─── Review Model ─────────────────────────────────────────────────────────────
 
 export interface ReviewModel {
   documentTitle: string;

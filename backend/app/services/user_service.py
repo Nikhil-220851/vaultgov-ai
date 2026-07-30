@@ -90,6 +90,10 @@ def update_user_profile(
     user.mobile_number = data.mobile_number
     user.email = data.email
 
+    # Save profile image URL (Cloudinary URL or None to remove)
+    if data.profile_image_url is not None:
+        user.profile_image_url = data.profile_image_url
+
     user.profile_completed = True
     user.updated_at = datetime.now(timezone.utc)
 

@@ -2,6 +2,7 @@ export const Radius = {
   xs: 4,
   sm: 8,
   md: 12,
+  lg: 16,
   button: 14, // Exact requirement for buttons
   card: 24,   // Exact requirement for card containers
   full: 9999,

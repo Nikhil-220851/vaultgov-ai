@@ -13,11 +13,11 @@ export const useNotificationNavigation = () => {
     } else if (meta.screen === 'SchemeDetail' && meta.scheme_id) {
       router.push(`/schemes/${meta.scheme_id}`);
     } else if (meta.screen === 'Security') {
-      router.push('/profile/security');
+      router.push('/(tabs)/profile');
     } else if (meta.screen === 'CompleteProfile') {
-      router.push('/profile/edit');
+      router.push('/edit-profile');
     } else if (meta.screen === 'Home') {
-      router.push('/(tabs)/vault');
+      router.push('/(tabs)/docs');
     }
   };
 

@@ -106,7 +106,7 @@ export function ProfileScreen() {
   const name = user?.full_name || 'Citizen User';
   const phone = user?.mobile_number || 'Not Linked';
   const email = user?.email || undefined;
-  const avatarInitials = name.trim().charAt(0).toUpperCase();
+  const profileImageUrl = user?.profile_image_url || null;
 
   const memberSinceYear = user?.created_at
     ? new Date(user.created_at).getFullYear()
@@ -145,8 +145,9 @@ export function ProfileScreen() {
           name={name}
           phone={phone}
           email={email}
-          avatarInitials={avatarInitials}
+          profileImageUrl={profileImageUrl}
           isVerified={!!user?.aadhaar_verified}
+          onEditPress={() => router.push('/edit-profile' as any)}
         />
 
         <SummaryCard

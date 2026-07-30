@@ -10,14 +10,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, Radius } from '@/theme';
+import { Avatar } from '../Avatar';
 
 interface ProfileHeaderProps {
   name: string;
   phone: string;
   email?: string;
-  avatarInitials: string;
+  profileImageUrl?: string | null;
   isVerified: boolean;
   onEditPress?: () => void;
+  onEditAvatarPress?: () => void;
 }
 
 function getGreeting() {
@@ -31,9 +33,10 @@ export function ProfileHeader({
   name,
   phone,
   email,
-  avatarInitials,
+  profileImageUrl,
   isVerified,
   onEditPress,
+  onEditAvatarPress,
 }: ProfileHeaderProps) {
   const [editScale] = useState(() => new Animated.Value(1));
   const [greeting, setGreeting] = useState(getGreeting());
@@ -64,9 +67,13 @@ export function ProfileHeader({
       <View style={styles.card}>
         <View style={styles.profileRow}>
           <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{avatarInitials}</Text>
-            </View>
+            <Avatar 
+              fullName={name} 
+              profileImageUrl={profileImageUrl} 
+              size={64} 
+              onPress={onEditAvatarPress}
+              showEditBadge={!!onEditAvatarPress}
+            />
             {isVerified && (
               <View style={styles.verifiedBadge}>
                 <Ionicons name="checkmark" size={10} color="#FFFFFF" />
@@ -144,19 +151,6 @@ const styles = StyleSheet.create({
   },
   avatarWrap: {
     position: 'relative',
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.primaryBlue,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: Typography.weights.bold,
-    color: '#FFFFFF',
   },
   verifiedBadge: {
     position: 'absolute',

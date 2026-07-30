@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, Notification } from '@/services/api';
+import { notificationService } from '@/services/NotificationService';
 
 interface NotificationStore {
   notifications: Notification[];
@@ -27,7 +28,7 @@ interface NotificationStore {
   reset: () => void;
 }
 
-let pollingInterval: NodeJS.Timeout | null = null;
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
 const POLLING_INTERVAL_MS = 30000; // 30 seconds
 
 export const useNotificationStore = create<NotificationStore>()(
@@ -71,6 +72,24 @@ export const useNotificationStore = create<NotificationStore>()(
             // Sort descending by created_at
             merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+            // Schedule local notifications for new unread items
+            const newUnread = newItems.filter(
+              (item) => !item.is_read && !state.notifications.some((existing) => existing.id === item.id)
+            );
+            
+            newUnread.forEach(item => {
+              notificationService.scheduleLocalNotification({
+                title: item.title,
+                body: item.message,
+                data: {
+                  type: item.type,
+                  notificationId: item.id,
+                  timestamp: item.created_at,
+                  route: '/(tabs)/notifications'
+                }
+              }, item.id); // Use item.id to avoid duplicate scheduling
+            });
+
             // TODO: Remove Debug Logs
             console.log(
               "[Notification Store]",
@@ -106,6 +125,7 @@ export const useNotificationStore = create<NotificationStore>()(
         try {
           const response = await apiClient.getUnreadCount();
           set({ unreadCount: response.count });
+          await notificationService.setBadgeCount(response.count);
         } catch (error) {
           console.error('[NotificationStore] Failed to fetch unread count:', error);
         }
@@ -119,6 +139,9 @@ export const useNotificationStore = create<NotificationStore>()(
           ),
           unreadCount: Math.max(0, state.unreadCount - 1),
         }));
+
+        const newCount = Math.max(0, get().unreadCount);
+        await notificationService.setBadgeCount(newCount);
 
         try {
           await apiClient.markNotificationRead(id);
@@ -136,6 +159,8 @@ export const useNotificationStore = create<NotificationStore>()(
           notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
           unreadCount: 0,
         }));
+
+        await notificationService.setBadgeCount(0);
 
         try {
           await apiClient.markAllNotificationsRead();
@@ -156,6 +181,8 @@ export const useNotificationStore = create<NotificationStore>()(
           unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount,
         }));
 
+        await notificationService.setBadgeCount(get().unreadCount);
+
         try {
           await apiClient.deleteNotification(id);
         } catch (error) {
@@ -168,6 +195,8 @@ export const useNotificationStore = create<NotificationStore>()(
       clearAll: async () => {
         // Optimistic update
         set({ notifications: [], unreadCount: 0, hasMore: false, currentPage: 1 });
+        await notificationService.setBadgeCount(0);
+        await notificationService.cancelAllNotifications();
 
         try {
           await apiClient.clearAllNotifications();

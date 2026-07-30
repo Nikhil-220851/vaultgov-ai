@@ -31,6 +31,7 @@ class UserProfileUpdate(BaseModel):
     annual_income: str
     mobile_number: Optional[str] = None
     email: Optional[str] = None
+    profile_image_url: Optional[str] = None
 
     @field_validator("email")
     @classmethod
@@ -84,6 +85,7 @@ class UserResponse(BaseModel):
     district: Optional[str]
     occupation: Optional[str]
     annual_income: Optional[str]
+    profile_image_url: Optional[str]
     profile_completed: bool
     onboarding_permissions_seen: bool
     aadhaar_verified: bool

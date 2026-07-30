@@ -7,7 +7,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#F7F8F5', // Matched background from colors
   },
   scrollContent: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: 24,
     paddingTop: Spacing.md,
   },
   
@@ -239,7 +239,6 @@ export const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
     padding: Spacing.md,
-    marginHorizontal: Spacing.xs,
     borderWidth: 1,
     borderColor: '#E6E6E6',
     borderStyle: 'dashed',
@@ -256,10 +255,10 @@ export const styles = StyleSheet.create({
     }) as ViewStyle),
   },
   overviewCardFirst: {
-    marginLeft: 0,
+    marginRight: Spacing.xs,
   },
   overviewCardLast: {
-    marginRight: 0,
+    marginLeft: Spacing.xs,
   },
   overviewCardHeader: {
     flexDirection: 'row',

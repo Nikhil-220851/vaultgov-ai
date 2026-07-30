@@ -11,7 +11,6 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SegmentedTabs } from '@/components/SegmentedTabs';
 import { useRouter } from 'expo-router';
@@ -29,7 +28,9 @@ import { SchemeDatabase } from '@/services/schemes/SchemeDatabase';
 import { SchemeRepository } from '@/services/schemes/SchemeRepository';
 import { SchemeRecord } from '@/services/schemes/types';
 import { SchemeCard } from '@/components/schemes/SchemeCard';
-import { SearchBar } from '@/components/schemes/SearchBar';
+import { SearchBar } from '@/components/SearchBar';
+import { AppHeader } from '@/components/AppHeader';
+import { PageContainer } from '@/components/PageContainer';
 import { FilterBottomSheet, SchemeFilter, DEFAULT_FILTER } from '@/components/schemes/FilterBottomSheet';
 import { ApplicationProgress } from '@/components/schemes/ApplicationProgress';
 import { colors } from '@/theme/colors';
@@ -312,16 +313,14 @@ export function SchemeCentreScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <PageContainer noPadding>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
       {/* ─── Sticky Header ─────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.pretitle}>Government Benefits</Text>
-            <Text style={styles.title}>Scheme Centre</Text>
-          </View>
+      <AppHeader
+        title="Scheme Centre"
+        subtitle="Government Benefits"
+        rightElement={
           <View style={styles.headerActions}>
             {activeFilterCount > 0 && (
               <View style={styles.filterBadge}>
@@ -336,15 +335,18 @@ export function SchemeCentreScreen() {
               <Ionicons name="options-outline" size={22} color={colors.black} />
             </TouchableOpacity>
           </View>
-        </View>
+        }
+        borderBottomColor="transparent"
+      />
 
+      <View style={styles.header}>
         {/* Search Bar */}
         <View style={styles.searchWrap}>
           <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
         </View>
 
         {/* Tab Pills */}
-        <View style={{ paddingHorizontal: Spacing.md, marginBottom: Spacing.sm }}>
+        <View style={{ paddingHorizontal: 24, marginBottom: Spacing.sm }}>
           <SegmentedTabs
             tabs={['Eligible', 'Applied', 'Saved']}
             activeTab={activeTab === 'eligible' ? 'Eligible' : activeTab === 'applied' ? 'Applied' : 'Saved'}
@@ -426,15 +428,11 @@ export function SchemeCentreScreen() {
         onApply={(f) => setFilter(f)}
         onClose={() => setFilterVisible(false)}
       />
-    </SafeAreaView>
+    </PageContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   // ── Header ──────────────────────────────────────────────────────────────────
   header: {
     backgroundColor: colors.background,
@@ -451,27 +449,6 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 2 },
     }),
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  pretitle: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: Typography.weights.semibold,
-    color: colors.primary,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: Typography.weights.bold,
-    color: colors.black,
-    letterSpacing: -0.3,
   },
   headerActions: {
     flexDirection: 'row',
@@ -506,7 +483,7 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   searchWrap: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: 24,
     marginBottom: Spacing.md,
   },
   // ── List ────────────────────────────────────────────────────────────────────

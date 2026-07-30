@@ -38,6 +38,7 @@ class User(Base):
     district = Column(String(80), nullable=True)
     occupation = Column(String(80), nullable=True)
     annual_income = Column(String(50), nullable=True)
+    profile_image_url = Column(String(500), nullable=True)
     profile_completed = Column(Boolean, nullable=False, default=False)
     expo_push_token = Column(String(200), nullable=True)
     """Expo push notification token. Updated on each app launch after login."""

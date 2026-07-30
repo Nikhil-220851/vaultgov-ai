@@ -1,16 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { ScrollView, View, Text, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { auth } from '@/services/firebase';
 import { useUser } from '@/context/UserContext';
 import { styles } from './styles';
 import { VaultGovStats } from '@/services/api';
 import { useStatsStore } from '@/store/useStatsStore';
 import { Colors, Typography, Spacing } from '@/theme';
 
-// Subcomponents — use named imports to satisfy import/no-named-as-default
-import { Header } from './components/Header';
+import { AppHeader } from '@/components/AppHeader';
+import { PageContainer } from '@/components/PageContainer';
+import { SectionTitle } from '@/components/SectionTitle';
 import { Greeting } from './components/Greeting';
 import { OverviewCard } from './components/OverviewCard';
 import { QuickActionCard } from './components/QuickActionCard';
@@ -36,9 +35,7 @@ export const HomeScreen: React.FC = () => {
   );
 
   // Pull logged-in user details if available
-  const displayName = dbUser?.full_name || auth.currentUser?.displayName || auth.currentUser?.phoneNumber || 'User';
-  // Get first letter of name for avatar
-  const avatarInitials = displayName ? displayName.trim().charAt(0).toUpperCase() : 'U';
+  const displayName = dbUser?.full_name || 'User';
 
   const QUICK_ACTIONS = [
     {
@@ -141,21 +138,28 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={localStyles.safeArea} edges={['top', 'left', 'right']}>
+    <PageContainer noPadding>
+      {/* Header */}
+      <AppHeader
+        showLogo={true}
+        fullName={dbUser?.full_name}
+        profileImageUrl={dbUser?.profile_image_url}
+        onPressAvatar={handleAvatarPress}
+        backgroundColor="#F7F8F5"
+        borderBottomColor="transparent"
+      />
+
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.scrollContent, localStyles.scrollContainer]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <Header avatarInitials={avatarInitials} onPressAvatar={handleAvatarPress} />
-
         {/* Greeting */}
         <Greeting userName={displayName} currentDate={new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
 
         {/* Overview Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>OVERVIEW</Text>
+          <SectionTitle title="OVERVIEW" />
         </View>
         <View style={styles.overviewGrid}>
           <OverviewCard
@@ -199,7 +203,7 @@ export const HomeScreen: React.FC = () => {
         {stats && stats.recent_uploads && stats.recent_uploads.length > 0 && (
           <>
             <View style={[styles.sectionHeader, localStyles.recentHeader]}>
-              <Text style={styles.sectionTitle}>RECENT DOCUMENTS</Text>
+              <SectionTitle title="RECENT DOCUMENTS" />
               <Pressable
                 onPress={() => router.push('/(tabs)/docs' as any)}
                 accessibilityRole="button"
@@ -220,7 +224,7 @@ export const HomeScreen: React.FC = () => {
 
         {/* Quick Actions Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitleDark}>QUICK ACTIONS</Text>
+          <SectionTitle title="QUICK ACTIONS" />
         </View>
         {QUICK_ACTIONS.map((action) => (
           <QuickActionCard
@@ -241,15 +245,11 @@ export const HomeScreen: React.FC = () => {
         onUploadImage={handleUploadImage}
         isPdfPickingActive={isPickingPdf}
       />
-    </SafeAreaView>
+    </PageContainer>
   );
 };
 
 const localStyles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F7F8F5',
-  },
   scrollContainer: {
     paddingBottom: 130, // Extra bottom padding so scroll content clears sticky tab navigation
   },

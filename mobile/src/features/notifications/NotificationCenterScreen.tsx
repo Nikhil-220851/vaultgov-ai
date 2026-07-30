@@ -6,6 +6,8 @@ import { EmptyNotifications } from './components/EmptyNotifications';
 import { NotificationGroup } from './components/NotificationGroup';
 import { isToday, isYesterday } from 'date-fns';
 import { Notification } from '@/services/api';
+import { PageContainer } from '@/components/PageContainer';
+import { AppHeader } from '@/components/AppHeader';
 
 export const NotificationCenterScreen = () => {
   const { 
@@ -62,19 +64,14 @@ export const NotificationCenterScreen = () => {
     );
   };
 
-  const renderHeader = () => (
-    <View style={styles.headerRow}>
-      <Text style={styles.headerTitle}>Notifications</Text>
-      {notifications.length > 0 && (
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleMarkAllRead}>
-            <Text style={styles.actionText}>Mark all read</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleClearAll} style={styles.clearBtn}>
-            <Text style={styles.actionTextClear}>Clear all</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+  const headerRight = (
+    <View style={styles.headerActions}>
+      <TouchableOpacity onPress={handleMarkAllRead}>
+        <Text style={styles.actionText}>Mark all read</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={handleClearAll} style={styles.clearBtn}>
+        <Text style={styles.actionTextClear}>Clear all</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -88,8 +85,11 @@ export const NotificationCenterScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      {renderHeader()}
+    <PageContainer noPadding>
+      <AppHeader
+        title="Notifications"
+        rightElement={notifications.length > 0 ? headerRight : undefined}
+      />
       
       {isLoading && notifications.length === 0 ? (
         <View style={styles.centered}>
@@ -114,7 +114,7 @@ export const NotificationCenterScreen = () => {
           ListFooterComponent={renderFooter}
         />
       )}
-    </View>
+    </PageContainer>
   );
 };
 
@@ -123,30 +123,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.md,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  headerTitle: {
-    fontSize: Typography.sizes.xxl,
-    fontWeight: Typography.weights.bold,
-    color: Colors.pureBlack,
-  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    marginBottom: 4,
   },
   actionText: {
-    fontSize: Typography.sizes.sm,
+    fontSize: Typography.sizes.caption,
     color: Colors.primaryBlue,
     fontWeight: Typography.weights.medium,
   },

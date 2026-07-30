@@ -41,6 +41,7 @@ export interface VaultGovUser {
   district: string | null;
   occupation: string | null;
   annual_income: string | null;
+  profile_image_url: string | null;
   profile_completed: boolean;
   onboarding_permissions_seen: boolean;
   aadhaar_verified: boolean;
@@ -64,6 +65,7 @@ export interface UserProfilePayload {
   annual_income: string;
   mobile_number?: string | null;
   email?: string | null;
+  profile_image_url?: string | null;
 }
 
 export interface UserPermissionsPayload {
@@ -80,6 +82,7 @@ export interface VaultGovDocument {
   image_uri: string | null;
   source: string;
   confidence_score: number | null;
+  status: 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'NO_EXPIRY' | 'INVALID_DATE' | null;
   created_at: string;
   updated_at: string;
 }
@@ -429,6 +432,58 @@ export const apiClient = {
       method: 'GET',
       headers: getHeaders(),
     });
+  },
+
+  async uploadProfileImage(localUri: string, reqId?: string): Promise<{ secure_url: string; public_id: string }> {
+    const requestId = reqId || generateRequestId();
+    console.log(`[UPLOAD START] [${requestId}] uploadProfileImage initiated`);
+
+    const extRaw = localUri.split('.').pop()?.toLowerCase() || 'jpg';
+    let extension = extRaw;
+    let mimeType = 'image/jpeg';
+
+    if (extRaw === 'png') {
+      mimeType = 'image/png';
+    } else if (extRaw === 'webp') {
+      mimeType = 'image/webp';
+    } else if (extRaw === 'heic') {
+      mimeType = 'image/heic';
+    } else if (extRaw === 'jpg' || extRaw === 'jpeg') {
+      mimeType = 'image/jpeg';
+    } else {
+      extension = 'jpg';
+    }
+
+    const name = `profile_${Date.now()}.${extension}`;
+
+    // Normalize Android/iOS URI
+    const normalizedUri = localUri.startsWith('file://') || localUri.startsWith('content://') || localUri.startsWith('http')
+      ? localUri 
+      : `file://${localUri}`;
+
+    const file = new File(normalizedUri);
+    const formData = new FormData();
+    (formData as any).append('file', file, name);
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+    
+    if (_authToken) {
+      headers['Authorization'] = `Bearer ${_authToken}`;
+    }
+
+    return fetchWithRetry<{ secure_url: string; public_id: string }>(
+      `${API_BASE_URL}/api/v1/uploads/image`,
+      {
+        method: 'POST',
+        body: formData,
+        headers: headers,
+      },
+      API_IMAGE_TIMEOUT_MS,
+      0, // maxRetries=0: image uploads are non-idempotent, never retry
+      requestId
+    );
   },
 
   async uploadImageToBackend(localUri: string, reqId?: string): Promise<{

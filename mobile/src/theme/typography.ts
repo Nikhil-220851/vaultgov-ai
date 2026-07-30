@@ -19,10 +19,14 @@ export const Typography = {
     xs: 12,
     sm: 14,
     md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-    xxxl: 28,
+    lg: 20,
+    xl: 24,
+    caption: 13,
+    subtitle: 15,
+    section: 18,
+    medium: 24,
+    large: 32,
+    xxl: 40,
   },
   weights: {
     regular: '400' as const,
@@ -34,10 +38,14 @@ export const Typography = {
     xs: 16,
     sm: 20,
     md: 24,
-    lg: 26,
-    xl: 28,
-    xxl: 32,
-    xxxl: 36,
+    lg: 28,
+    xl: 32,
+    xxl: 40,
+    caption: 18,
+    subtitle: 20,
+    section: 24,
+    medium: 32,
+    large: 40,
   },
 } as const;
 
@@ -51,9 +59,9 @@ export const typography = {
   },
   sizes: {
     title: 30, // Specified splash title size
-    subtitle: Typography.sizes.sm, // 14
-    body: Typography.sizes.xs, // 12
-    bottom: Typography.sizes.xs, // 12
+    subtitle: Typography.sizes.subtitle, // 15
+    body: Typography.sizes.caption, // 13
+    bottom: Typography.sizes.caption, // 13
   },
   weights: {
     bold: Typography.weights.bold,

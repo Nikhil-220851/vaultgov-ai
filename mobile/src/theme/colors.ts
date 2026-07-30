@@ -4,6 +4,7 @@ export const Colors = {
   primaryOrange: '#FF9800',
   primaryGreen: '#3CC556',
   dangerRed: '#FF3B30',
+  error: '#FF3B30',
   softPink: '#F1D0D0',
   darkGray: '#707070',
   pureBlack: '#000000',

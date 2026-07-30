@@ -22,6 +22,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, Radius } from '@/theme';
 import { OCRStatus } from '../services/ocr.service';
+import { PdfProgressStage } from '../types/review.types';
 
 interface OCRStatusBannerProps {
   status: OCRStatus;
