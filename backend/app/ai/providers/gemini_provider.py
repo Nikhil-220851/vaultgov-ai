@@ -1,0 +1,124 @@
+import os
+import logging
+import time
+from typing import Optional
+from google import genai
+from google.genai import types
+from app.ai.providers.base_provider import AIProvider
+
+logger = logging.getLogger(__name__)
+
+class GeminiProvider(AIProvider):
+    def __init__(self):
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        self._model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        
+        try:
+            self._temperature = float(os.getenv("GEMINI_TEMPERATURE", "0.7"))
+        except ValueError:
+            self._temperature = 0.7
+            
+        if self.api_key:
+            self.client = genai.Client(api_key=self.api_key)
+            self.model = True
+        else:
+            self.client = None
+            self.model = None
+            logger.warning("GEMINI_API_KEY is not set. GeminiProvider is disabled.")
+
+    @property
+    def provider_name(self) -> str:
+        return "gemini"
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
+
+    @property
+    def supports_streaming(self) -> bool:
+        return True
+
+    @property
+    def supports_tools(self) -> bool:
+        return True
+
+    @property
+    def supports_json(self) -> bool:
+        return True
+
+    def generate_response(
+        self, 
+        message: str, 
+        system_prompt: Optional[str] = None, 
+        context: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None
+    ) -> Optional[str]:
+        if not self.model:
+            logger.error("Model not initialized (missing API key?)")
+            raise Exception("GeminiProvider is not initialized due to missing API key.")
+
+        prompt_lines = []
+        if context:
+            prompt_lines.append(f"Context:\n{context}\n")
+        prompt_lines.append(f"User Message:\n{message}")
+        
+        prompt = "\n".join(prompt_lines)
+
+        try:
+            import importlib.metadata
+            sdk_version = importlib.metadata.version('google-genai')
+        except Exception:
+            sdk_version = 'Unknown'
+
+        # Use passed temperature if available, else default
+        final_temp = temperature if temperature is not None else self._temperature
+        config_kwargs = {"temperature": final_temp}
+        
+        if system_prompt:
+            config_kwargs["system_instruction"] = system_prompt
+        if max_tokens is not None:
+            config_kwargs["max_output_tokens"] = max_tokens
+            
+        config = types.GenerateContentConfig(**config_kwargs)
+
+        start_time = time.time()
+        
+        logger.info(f"--- DEBUG: BEFORE GENERATE_CONTENT ---")
+        logger.info(f"Timestamp: {start_time}")
+        logger.info(f"API key present: {bool(self.api_key)}")
+        logger.info(f"SDK version: {sdk_version}")
+        logger.info(f"Model name: {self._model_name}")
+        logger.info(f"Prompt length: {len(prompt)} characters")
+        logger.info(f"Config object: {config}")
+        
+        for attempt in range(1, 4):
+            try:
+                response = self.client.models.generate_content(
+                    model=self._model_name,
+                    contents=prompt,
+                    config=config
+                )
+                
+                end_time = time.time()
+                logger.info(f"--- GEMINI REQUEST END (Success) ---")
+                logger.info(f"Duration: {end_time - start_time:.3f}s")
+                
+                if response.text:
+                    return response.text
+                else:
+                    logger.warning("Gemini returned successfully but no text exists.")
+                    return None
+                    
+            except Exception as e:
+                end_time = time.time()
+                logger.warning(f"Gemini API failure (attempt {attempt}/3): {type(e).__name__} - {str(e)}")
+                if attempt == 3:
+                    logger.error(f"--- GEMINI REQUEST END (Failed all retries) ---")
+                    logger.error(f"Duration: {end_time - start_time:.3f}s")
+                    logger.exception("Complete traceback for Gemini API failure:")
+                    raise e
+                time.sleep(2 ** attempt)  # Exponential backoff (2s, 4s)
+
+    def health_check(self) -> bool:
+        return bool(self.client and self.api_key)

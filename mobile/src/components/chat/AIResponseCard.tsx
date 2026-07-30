@@ -23,7 +23,9 @@ interface AIResponseCardProps {
   onSecondaryAction?: () => void;
 }
 
-export function AIResponseCard({ data, onPrimaryAction, onSecondaryAction }: AIResponseCardProps) {
+export function AIResponseCard(props: AIResponseCardProps) {
+  console.log("AIResponseCard props:", props);
+  const { data, onPrimaryAction, onSecondaryAction } = props;
   const [fadeAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {

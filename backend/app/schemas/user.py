@@ -72,6 +72,16 @@ class UserProfileUpdate(BaseModel):
 class UserPermissionsUpdate(BaseModel):
     onboarding_permissions_seen: bool
 
+class UserAIPreferencesUpdate(BaseModel):
+    memory_enabled: bool
+    detailed_responses: bool
+
+class UserAIPreferencesResponse(BaseModel):
+    memory_enabled: bool
+    detailed_responses: bool
+    
+    model_config = {"from_attributes": True}
+
 
 class UserResponse(BaseModel):
     id: UUID

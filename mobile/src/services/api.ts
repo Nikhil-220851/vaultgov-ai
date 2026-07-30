@@ -13,17 +13,70 @@
 
 import { API_BASE_URL, API_TIMEOUT_MS, API_PDF_TIMEOUT_MS, API_IMAGE_TIMEOUT_MS, API_MAX_RETRIES } from '@/config/api.config';
 import { File } from 'expo-file-system';
+import { auth } from '@/services/firebase';
 
 // ─── Error Types ──────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
+  public readonly status: number;
+  public readonly statusText?: string;
+  public readonly responseBody?: string;
+  public readonly url?: string;
+  public readonly method?: string;
+
   constructor(
     public readonly status: number,
-    message: string,
-    public readonly detail?: any
+    message: string | object,
+    public readonly detail?: any,
+    options?: {
+      statusText?: string;
+      responseBody?: string;
+      url?: string;
+      method?: string;
+    }
   ) {
-    super(message);
+    let finalMessage = '';
+    if (typeof message === 'object' && message !== null) {
+      try {
+        finalMessage = JSON.stringify(message);
+      } catch {
+        finalMessage = String(message);
+      }
+    } else {
+      finalMessage = String(message);
+    }
+    super(finalMessage);
+    this.status = status;
+    this.statusText = options?.statusText;
+    this.responseBody = options?.responseBody;
+    this.url = options?.url;
+    this.method = options?.method;
     this.name = 'ApiError';
+
+    // Set prototype chain explicitly for TypeScript/ES5 transpilation
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+
+  toString(): string {
+    const methodPart = this.method ? `${this.method} ` : '';
+    const urlPart = this.url ? this.url : '';
+    const statusPart = `Status: ${this.status}${this.statusText ? ' ' + this.statusText : ''}`;
+    
+    let responsePart = '';
+    if (this.responseBody) {
+      try {
+        const parsed = JSON.parse(this.responseBody);
+        responsePart = `Response:\n${JSON.stringify(parsed, null, 4)}`;
+      } catch {
+        responsePart = `Response:\n${this.responseBody}`;
+      }
+    } else {
+      responsePart = `Response:\n{"message": "${this.message}"}`;
+    }
+
+    const stackPart = this.stack ? `\n\nStack Trace:\n${this.stack}` : '';
+
+    return `${methodPart}${urlPart}\n\n${statusPart}\n\n${responsePart}${stackPart}`;
   }
 }
 
@@ -140,6 +193,14 @@ export interface RecommendationsSummary {
   top_missing: string[];
 }
 
+export interface Conversation {
+  id: string;
+  title: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Notification {
   id: string;
   user_id: string;
@@ -158,6 +219,19 @@ export interface Notification {
   expires_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  assistant_data?: any;
+  created_at: string;
+}
+
+export interface ConversationWithMessages extends Conversation {
+  messages: ConversationMessage[];
 }
 
 export interface NotificationListResponse {
@@ -304,6 +378,20 @@ async function fetchWithRetry<T>(
   const requestId = reqId || generateRequestId();
   let lastError: Error = new Error('Unknown error');
 
+  // 1) Proactively check for token freshness before starting the fetch
+  if (auth.currentUser) {
+    try {
+      const freshToken = await auth.currentUser.getIdToken();
+      _authToken = freshToken; // update local cache
+      options.headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${freshToken}`,
+      };
+    } catch (e) {
+      console.warn(`[API] [${requestId}] Failed to get fresh ID token before request:`, e);
+    }
+  }
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) {
       console.log(`[RETRY] [${requestId}] Attempt ${attempt + 1}/${maxRetries + 1}`);
@@ -317,8 +405,27 @@ async function fetchWithRetry<T>(
     } catch (err: any) {
       lastError = err;
       
-      // Do not retry on client deterministic errors (4xx)
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+      // 2) Handle 401 Unauthorized forced token refresh
+      if (err instanceof ApiError && err.status === 401 && auth.currentUser) {
+        console.log(`[AUTH] [${requestId}] 401 received, forcing token refresh...`);
+        try {
+          const forceRefreshedToken = await auth.currentUser.getIdToken(true);
+          _authToken = forceRefreshedToken;
+          options.headers = {
+            ...options.headers,
+            'Authorization': `Bearer ${forceRefreshedToken}`,
+          };
+          console.log(`[AUTH] [${requestId}] Token force refreshed successfully. Retrying once...`);
+          // Retry exactly once after forced refresh
+          return await fetchAndParse<T>(url, options, timeoutMs, requestId);
+        } catch (refreshErr) {
+          console.error(`[AUTH] [${requestId}] Failed to force refresh token:`, refreshErr);
+          throw err; // throw original 401 if refresh fails
+        }
+      }
+
+      // Do not retry on client deterministic errors (4xx) or server bugs (500)
+      if (err instanceof ApiError && ((err.status >= 400 && err.status < 500) || err.status === 500)) {
         throw err;
       }
 
@@ -673,6 +780,61 @@ export const apiClient = {
     return fetchWithRetry<RecommendationsSummary>(url, { method: 'GET', headers: getHeaders() });
   },
 
+
+  /**
+   * POST /api/copilot/chat
+   * Chat with the VaultGov Copilot.
+   */
+  async chatWithCopilot(message: string, conversation_id?: string, signal?: AbortSignal): Promise<{
+    message: string;
+    intent: string;
+    confidence: number;
+    actions: { type: string; label: string; data?: any }[];
+    cards?: any[];
+    quick_replies?: any[];
+    sources: { type: string; id: string; title: string; url?: string }[];
+    metadata: Record<string, any>;
+  }> {
+    const url = `${API_BASE_URL}/api/copilot/chat`;
+    const headers = getHeaders();
+    const payload: any = { message };
+    if (conversation_id) payload.conversation_id = conversation_id;
+    const reqBody = JSON.stringify(payload);
+    
+    console.log(`[API chatWithCopilot] Request URL: ${url}`);
+    console.log('[API chatWithCopilot] Request Headers:', JSON.stringify(headers, null, 2));
+    console.log('[API chatWithCopilot] Request Body:', reqBody);
+    
+    const response = await fetchWithRetry<{
+      message: string;
+      intent: string;
+      confidence: number;
+      actions: { type: string; label: string; data?: any }[];
+      cards?: any[];
+      quick_replies?: any[];
+      sources: { type: string; id: string; title: string; url?: string }[];
+      metadata: Record<string, any>;
+    }>(url, {
+      method: 'POST',
+      headers: headers,
+      body: reqBody,
+      signal,
+    }, API_TIMEOUT_MS, 0); // No retries for non-idempotent chat requests
+    return response;
+  },
+
+  /**
+   * GET /api/copilot/conversations
+   * Fetch recent conversations for user.
+   */
+  async getConversations(limit: number = 20, offset: number = 0): Promise<Conversation[]> {
+    const url = `${API_BASE_URL}/api/copilot/conversations?limit=${limit}&offset=${offset}`;
+    return fetchWithRetry<Conversation[]>(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+  },
+
   // ─── Notifications ─────────────────────────────────────────────────────────────
 
   async getNotifications(page: number = 1, pageSize: number = 20, category?: string, unreadOnly: boolean = false): Promise<NotificationListResponse> {
@@ -690,9 +852,47 @@ export const apiClient = {
     });
   },
 
+  /**
+   * GET /api/copilot/conversations/:id
+   * Fetch conversation history by ID.
+   */
+  async getConversationHistory(id: string): Promise<ConversationWithMessages> {
+    const url = `${API_BASE_URL}/api/copilot/conversations/${encodeURIComponent(id)}`;
+    return fetchWithRetry<ConversationWithMessages>(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+  },
+
   async getUnreadCount(): Promise<UnreadCountResponse> {
     return fetchWithRetry<UnreadCountResponse>(`${API_BASE_URL}/api/v1/notifications/unread-count`, {
       method: 'GET',
+      headers: getHeaders(),
+    });
+  },
+
+
+  /**
+   * PATCH /api/copilot/conversations/:id
+   * Rename a conversation.
+   */
+  async renameConversation(id: string, title: string): Promise<Conversation> {
+    const url = `${API_BASE_URL}/api/copilot/conversations/${encodeURIComponent(id)}`;
+    return fetchWithRetry<Conversation>(url, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ title }),
+    });
+  },
+
+  /**
+   * DELETE /api/copilot/conversations/:id
+   * Delete a conversation.
+   */
+  async deleteConversation(id: string): Promise<void> {
+    const url = `${API_BASE_URL}/api/copilot/conversations/${encodeURIComponent(id)}`;
+    return fetchWithRetry<void>(url, {
+      method: 'DELETE',
       headers: getHeaders(),
     });
   },

@@ -228,6 +228,7 @@ export const BASE_SCHEMES_DATA = [
     studentEligible: false,
     farmerEligible: true,
     seniorCitizenEligible: true,
+    disabledEligible: true
   },
   {
     schemeId: 'scheme-003',

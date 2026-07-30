@@ -1,35 +1,59 @@
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from 'expo-router';
 import { useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { UserProvider, useUser } from '@/context/UserContext';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { NotificationProvider } from '@/context/NotificationProvider';
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { pushNotificationService } from '@/services/pushNotificationService';
+import { useRouter, useRootNavigationState } from 'expo-router';
+import { useEffect, ReactNode } from 'react';
 
-function RootLogic() {
+function NotificationBootstrap({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
   const startPolling = useNotificationStore((state) => state.startPolling);
   const stopPolling = useNotificationStore((state) => state.stopPolling);
 
+  // Gate notification handlers until navigation is ready
+  const isNavigationReady = rootNavigationState?.key != null;
+
   useEffect(() => {
+    if (!isNavigationReady) return;
+
+    let unsubscribeNotifications: (() => void) | undefined;
+
     if (user) {
-      // User is authenticated, start notification polling
       startPolling();
+      unsubscribeNotifications = pushNotificationService.setupNotificationHandlers(router);
+      pushNotificationService.registerForPushNotificationsAsync();
     } else {
-      // User is not authenticated or logged out
       stopPolling();
     }
-  }, [user, startPolling, stopPolling]);
 
-  return <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />;
+    return () => {
+      if (unsubscribeNotifications) {
+        unsubscribeNotifications();
+      }
+    };
+  }, [user, router, isNavigationReady, startPolling, stopPolling]);
+
+  return <>{children}</>;
 }
 
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+function AuthBootstrap({ children }: { children: ReactNode }) {
+  // Passthrough for now. In the future, this can listen to auth events independently.
+  return <>{children}</>;
+}
 
-export default function RootLayout() {
+function NavigationRoot({ children }: { children: ReactNode }) {
+  // Logical wrapper representing the boundary between Providers and Router logic
+  return <>{children}</>;
+}
+
+function AppProviders({ children }: { children: ReactNode }) {
   const colorScheme = useColorScheme();
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -37,12 +61,26 @@ export default function RootLayout() {
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <UserProvider>
             <NotificationProvider>
-              <RootLogic />
+              {children}
             </NotificationProvider>
           </UserProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AppProviders>
+      <NavigationRoot>
+        <NotificationBootstrap>
+          <AuthBootstrap>
+            <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />
+          </AuthBootstrap>
+        </NotificationBootstrap>
+      </NavigationRoot>
+    </AppProviders>
   );
 }
 
