@@ -72,11 +72,21 @@ if not cloudinary_service.CLOUDINARY_API_KEY or not cloudinary_service.CLOUDINAR
 
 # ── Endpoint ───────────────────────────────────────────────────────────────────
 
-@router.post("/image")
-async def upload_image(file: UploadFile = File(...)):
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
+from app.core.firebase_admin import get_current_uid
+
+from app.core.rate_limit import upload_limiter
+
+@router.post("/image", dependencies=[upload_limiter])
+async def upload_image(
+    file: UploadFile = File(...),
+    current_uid: str = Depends(get_current_uid)
+):
     # ── Step 0: MIME guard (fast-fail before reading bytes) ────────────────────
+    import os
+    safe_filename = os.path.basename(file.filename) if file.filename else "upload.jpg"
     print(
-        f"[uploads.py] Incoming: filename={file.filename!r}, "
+        f"[uploads.py] Incoming: filename={safe_filename!r}, "
         f"content_type={file.content_type!r}"
     )
 
@@ -183,11 +193,8 @@ async def upload_image(file: UploadFile = File(...)):
         print(f"OCR FAILED [{type(e).__name__}]: {e}")
         traceback.print_exc()
         print("=======================================")
-        return {
-            "success": False,
-            "message": "OCR engine is unavailable.",
-            "error": "Tesseract is not installed." if "tesseract is not installed" in str(e).lower() else str(e)
-        }
+        # Graceful fallback: return the uploaded image without OCR data
+        return _build_response(res, "", "unknown", "Unknown", "Unknown", None, False)
 
     # ── Step 3c: Template detection ────────────────────────────────────────────
     print("Running TemplateMatcher...")

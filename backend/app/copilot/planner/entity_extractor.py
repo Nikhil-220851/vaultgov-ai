@@ -8,8 +8,12 @@ class EntityExtractor:
         text_lower = text.lower()
         if "passport" in text_lower:
             doc_types.append("passport")
-        if "driving license" in text_lower or "driver's license" in text_lower or "license" in text_lower:
+        if "driving license" in text_lower or "driver's license" in text_lower or "license" in text_lower or "driving licence" in text_lower or "licence" in text_lower or "dl" in text_lower:
             doc_types.append("driving_license")
+        if "aadhaar" in text_lower or "aadhar" in text_lower:
+            doc_types.append("aadhaar")
+        if "pan" in text_lower:
+            doc_types.append("pan_card")
         if re.search(r'\bid\b', text_lower) or "identity" in text_lower:
             doc_types.append("id_card")
         if "tax" in text_lower or "w2" in text_lower or "1099" in text_lower:

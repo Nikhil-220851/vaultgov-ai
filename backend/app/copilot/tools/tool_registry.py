@@ -33,7 +33,9 @@ class ToolRegistry:
         self.register_tool(NotificationTool())
         
     def register_tool(self, tool: BaseTool):
-        """Register a tool dynamically."""
+        """Register a tool dynamically, ensuring no duplicates."""
+        if tool.name in self._tools:
+            raise ValueError(f"Tool '{tool.name}' is already registered. Duplicate registration is not allowed.")
         self._tools[tool.name] = tool
         
     def get_all_tools(self) -> List[BaseTool]:

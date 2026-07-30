@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 from app.copilot.tools.base_tool import BaseTool
 from app.copilot.tools.tool_result import ToolResult
-from app.copilot.planner.planner_types import PlannerResult, Intent
+from app.copilot.types import Intent
+from app.copilot.planner.planner_types import PlannerResult
 from app.services import user_service
 from app.models.notification import Notification
 
@@ -23,8 +24,8 @@ class NotificationTool(BaseTool):
         Handles requests related to expiries, renewals, and alerts.
         """
         return planner_result.intent in (
-            Intent.DOCUMENT_EXPIRY,
-            Intent.DOCUMENT_RENEWAL
+            Intent.DOCUMENT_REMINDER,
+            Intent.RENEWAL_GUIDE
         )
         
     def execute(self, db: Session, current_uid: str, planner_result: PlannerResult) -> ToolResult:

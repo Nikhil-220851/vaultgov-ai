@@ -32,6 +32,8 @@ router = APIRouter(prefix="/copilot", tags=["copilot"])
 logger = logging.getLogger("app.copilot.chat")
 
 
+from app.core.rate_limit import chat_limiter
+
 @router.post(
     "/chat",
     response_model=ChatResponse,
@@ -41,6 +43,7 @@ logger = logging.getLogger("app.copilot.chat")
         "Send a message to the VaultGov Copilot. "
         "Phase 2.5: returns real data from database for supported intents."
     ),
+    dependencies=[chat_limiter]
 )
 async def copilot_chat(
     request: Request,
@@ -57,15 +60,8 @@ async def copilot_chat(
     2. Resolves structured data payloads from the database via DataResolver.
     3. Builds the final user-facing response, actions, and sources via Response Builder.
     """
-    # Print request body and parsed body as per Step 2
     import time
     t0 = time.time()
-    print("START REQUEST")
-    print(f"[{time.time() - t0:.3f}s] Authentication completed")
-    raw_body = await request.body()
-    print("================== COPILOT ENDPOINT TRACE ==================")
-    print("Request Body (Raw):", raw_body.decode("utf-8"))
-    print("Parsed Body:", payload.model_dump())
     
     # ================== INTENT PLANNER (Phase 1.2) ==================
     from app.copilot.planner.planner import IntentPlanner
@@ -115,8 +111,6 @@ async def copilot_chat(
         conversation_service = ConversationService(db)
         context_service = ConversationContextService()
 
-        print(f"[{time.time() - t0:.3f}s] Conversation lookup started")
-
         if payload.conversation_id:
             conversation = conversation_service.get_conversation(payload.conversation_id)
             if not conversation or conversation.user_id != current_uid:
@@ -125,7 +119,6 @@ async def copilot_chat(
             conversation = conversation_service.create_conversation(current_uid, payload.message)
 
         conversation_id = conversation.id
-        print(f"[{time.time() - t0:.3f}s] Conversation lookup finished")
 
         # Fetch DB history for intent detection (excluding the current un-saved message)
         db_history = conversation_service.get_conversation_history(conversation_id)
@@ -133,29 +126,23 @@ async def copilot_chat(
         
         active_context = EntityTracker.extract_context(history)
 
-        # 2. Custom inline checks for profile, stats, active schemes to route to the correct intents
-        if "profile" in message_lower:
-            intent = Intent.PROFILE_SUMMARY
-            confidence = 1.0
-            matched_on = "inline_profile"
-        elif any(k in message_lower for k in ("stat", "statistics", "upload count", "summary of my uploads")):
-            intent = Intent.APPLICATION_STATISTICS
-            confidence = 1.0
-            matched_on = "inline_statistics"
-        elif any(k in message_lower for k in ("active scheme", "list scheme", "all schemes", "show schemes", "my schemes", "schemes")):
-            intent = Intent.ACTIVE_SCHEMES
-            confidence = 1.0
-            matched_on = "inline_active_schemes"
-        elif any(k in message_lower for k in ("my documents", "documents", "document status", "show documents", "view documents", "list documents")):
-            intent = Intent.DOCUMENT_STATUS
-            confidence = 1.0
-            matched_on = "inline_document_status"
+        # 2. Hybrid Intent Routing
+        detect_result = detect_intent(payload.message, active_context)
+        
+        if detect_result.intent not in (Intent.UNKNOWN, Intent.UNSUPPORTED) and detect_result.confidence >= 0.75:
+            # Deterministic rule layer takes precedence!
+            intent = detect_result.intent
+            confidence = detect_result.confidence
+            matched_on = f"rule_layer_{detect_result.matched_on}"
+            
+            # Override planner's intent for subsequent tool routing
+            planner_result.intent = intent
+            planner_result.confidence = confidence
         else:
-            # Fallback to intent detector
-            result = detect_intent(payload.message, active_context)
-            intent = result.intent
-            confidence = result.confidence
-            matched_on = result.matched_on
+            # Fallback to planner
+            intent = planner_result.intent
+            confidence = planner_result.confidence
+            matched_on = "planner"
 
         # 2. Execute Orchestration Framework Tools
         from app.copilot.tools.tool_router import ToolRouter
@@ -218,10 +205,11 @@ async def copilot_chat(
             skipped.append("Documents")
             
         if ContextSource.SCHEMES in planner_result.needs:
-            resolver_data["schemes"] = DataResolver.resolve_schemes(db)
-            if intent in (Intent.ELIGIBILITY, Intent.ELIGIBILITY_REASON):
-                resolver_data["eligibility"] = DataResolver.resolve_eligibility(db, current_uid)
-            loaded.append("Schemes")
+            if not any(tr.success for tr in tool_results if tr.tool_name == "SchemeTool"):
+                logger.warning("Schemes requested but SchemeTool did not execute successfully. DataResolver no longer handles schemes.")
+                skipped.append("Schemes")
+            else:
+                loaded.append("Schemes")
         else:
             skipped.append("Schemes")
             
@@ -294,14 +282,12 @@ async def copilot_chat(
         
         # Validate prompt and context length
         if PromptValidator.validate(system_prompt, context_text):
-            print(f"[{time.time() - t0:.3f}s] Gemini request started")
             # Generate raw response from provider
             raw_ai_message = provider.generate_response(
                 message=payload.message,
                 system_prompt=system_prompt,
                 context=context_text
             )
-            print(f"[{time.time() - t0:.3f}s] Gemini request finished")
             
             # Check response quality
             if raw_ai_message and not ResponseQualityCheck.check_quality(raw_ai_message):
@@ -318,12 +304,18 @@ async def copilot_chat(
             response.message = "I'm having trouble processing your request right now. Please try again later."
             
         # Log structured information
-        logger.info(f"Intent: {intent.value}")
-        logger.info(f"History Turns: {len(history)}")
-        logger.info(f"Prompt: {intent.name.lower()}_prompt")
-        logger.info(f"Context Tokens: {len(context_text) // 4}") # approximation
-        logger.info(f"Response Time: {elapsed_time:.2f}s")
-        logger.info(f"Fallback Used: {fallback_used}")
+        logger.info(
+            "Copilot response generated",
+            extra={
+                "conversation_id": conversation_id,
+                "user_id": current_uid,
+                "intent": intent.value,
+                "tool_selected": ",".join([tr.tool_name for tr in tool_results]) if tool_results else "None",
+                "history_turns": len(history),
+                "response_time": elapsed_time,
+                "fallback_used": fallback_used
+            }
+        )
         
         # Save assistant message to DB
         backend_context = {
@@ -340,41 +332,31 @@ async def copilot_chat(
             "metadata": response.metadata,
             "sources": [source.model_dump() for source in response.sources]
         }
-        print(f"[{time.time() - t0:.3f}s] Database save started")
         conversation_service.add_message(conversation_id, "assistant", response.message, assistant_data=assistant_data)
-        print(f"[{time.time() - t0:.3f}s] Database save finished")
-        
+
         # Add conversation_id to response metadata so client can track it
         response.metadata["conversation_id"] = conversation_id
 
-        print("Response Body:", response.model_dump())
-        print("================== TYPE INSPECTION ==================")
-        def print_types(obj, path=""):
-            if isinstance(obj, dict):
-                for k, v in obj.items():
-                    print_types(v, path + f"['{k}']")
-            elif isinstance(obj, list):
-                for i, v in enumerate(obj):
-                    print_types(v, path + f"[{i}]")
-            else:
-                if "CopilotSource" in str(type(obj)):
-                    print(f"FOUND CopilotSource at: {path}")
-                print(f"{path}: {type(obj)}")
-        
-        print("Response object type:", type(response))
-        print_types(response.model_dump(), "response_dump")
-        for field_name in response.model_fields.keys():
-            val = getattr(response, field_name)
-            print_types(val, f"response.{field_name}")
-            
-        print("============================================================")
-        print(f"[{time.time() - t0:.3f}s] Returning response")
         return response
     except Exception as e:
-        import traceback
-        logger.exception("Copilot failed")
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+        from pydantic import ValidationError
+        
+        if isinstance(e, (ValidationError, AttributeError, KeyError, ImportError, RuntimeError, TypeError, ValueError, IndexError, NameError)):
+            logger.exception(f"Copilot failed with a programming defect: {e}")
+            # Re-raise so the global exception handler can catch and log the full request context
+            raise e
+            
+        logger.exception(f"Copilot encountered an expected failure: {str(e)}")
+        
+        fallback_response = build_response(
+            intent=Intent.UNKNOWN,
+            confidence=0.0,
+            resolver_data={},
+            matched_on="fallback_exception"
         )
+        # Override the message to reflect the error
+        fallback_response.message = (
+            "I'm sorry, I encountered an unexpected error while processing your request. "
+            "Please try again."
+        )
+        return fallback_response

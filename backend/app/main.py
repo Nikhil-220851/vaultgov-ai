@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from contextlib import asynccontextmanager
 from app.api.users import router as users_router
 from app.api.documents import router as documents_router
 from app.api.stats import router as stats_router
@@ -16,12 +16,66 @@ from app.core.firebase_admin import initialize_firebase
 from app.database.connection import test_connection, DATABASE_URL
 from app.services.scheme_sync_job import SyncScheduler
 from app.services.notification_scheduler import NotificationScheduler
+import logging
+from app.core.logging_config import setup_logging
+from app.core.architecture_validator import validate_architecture
+setup_logging()
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting VaultGov AI API...")
+    validate_architecture()
+    test_connection()
+    initialize_firebase()
+    scheduler.start()
+    notification_scheduler.start()
+    yield
+    # Shutdown
+    scheduler.stop()
+    notification_scheduler.stop()
 
 app = FastAPI(
     title="VaultGov API",
     version="1.0.0",
     description="Backend API for VaultGov AI — Citizen Document Portal",
+    lifespan=lifespan
 )
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # Log HTTP exceptions if they are server errors (500+)
+    if exc.status_code >= 500:
+        logger.exception(f"HTTP {exc.status_code} Error on {request.method} {request.url.path}: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.exception(f"Validation Error on {request.method} {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(
+        f"Unhandled Exception on {request.method} {request.url.path}: "
+        f"{type(exc).__name__} - {str(exc)}"
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"}
+    )
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 # Allow Expo dev client + any future web deployment.
@@ -106,12 +160,11 @@ def shutdown_event() -> None:
     notification_scheduler.stop()
 
 
+from app.api.health import router as health_router
+
 # ─── Health ───────────────────────────────────────────────────────────────────
 @app.get("/")
 def root() -> dict:
     return {"message": "VaultGov Backend API is running"}
 
-
-@app.get("/health")
-def health() -> dict:
-    return {"status": "healthy"}
+app.include_router(health_router)

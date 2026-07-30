@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 from app.copilot.tools.base_tool import BaseTool
 from app.copilot.tools.tool_result import ToolResult
-from app.copilot.planner.planner_types import PlannerResult, Intent, ContextSource
+from app.copilot.types import Intent
+from app.copilot.planner.planner_types import PlannerResult, ContextSource
 from app.models.scheme import Scheme
 from app.copilot.eligibility_engine import EligibilityEngine
 
@@ -22,7 +23,7 @@ class SchemeTool(BaseTool):
         """
         Handles scheme and eligibility intents, or if schemes are requested in needs.
         """
-        if planner_result.intent in (Intent.SCHEME_DISCOVERY, Intent.ELIGIBILITY_CHECK):
+        if planner_result.intent in (Intent.ACTIVE_SCHEMES, Intent.ELIGIBILITY):
             return True
         if ContextSource.SCHEMES in planner_result.needs:
             return True
@@ -50,7 +51,7 @@ class SchemeTool(BaseTool):
         }
         
         # If eligibility check is explicitly requested or intent matches
-        if planner_result.intent in (Intent.ELIGIBILITY_CHECK, ) or ContextSource.SCHEMES in planner_result.needs:
+        if planner_result.intent in (Intent.ELIGIBILITY, ) or ContextSource.SCHEMES in planner_result.needs:
             # Note: EligibilityEngine handles caching and user record lookup
             result = EligibilityEngine.evaluate_all(db, current_uid)
             data["eligibility"] = result

@@ -2,18 +2,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 
-class Intent(str, Enum):
-    GREETING = "GREETING"
-    DOCUMENT_STATUS = "DOCUMENT_STATUS"
-    DOCUMENT_RENEWAL = "DOCUMENT_RENEWAL"
-    DOCUMENT_UPLOAD = "DOCUMENT_UPLOAD"
-    SCHEME_DISCOVERY = "SCHEME_DISCOVERY"
-    ELIGIBILITY_CHECK = "ELIGIBILITY_CHECK"
-    DOCUMENT_EXPIRY = "DOCUMENT_EXPIRY"
-    PROFILE = "PROFILE"
-    GENERAL_CHAT = "GENERAL_CHAT"
-    HELP = "HELP"
-    UNKNOWN = "UNKNOWN"
+from app.copilot.types import Intent
 
 class ContextSource(str, Enum):
     DOCUMENTS = "documents"

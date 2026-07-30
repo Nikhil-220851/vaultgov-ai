@@ -92,32 +92,33 @@ class GeminiProvider(AIProvider):
         logger.info(f"Prompt length: {len(prompt)} characters")
         logger.info(f"Config object: {config}")
         
-        try:
-            response = self.client.models.generate_content(
-                model=self._model_name,
-                contents=prompt,
-                config=config
-            )
-            
-            end_time = time.time()
-            logger.info(f"--- GEMINI REQUEST END (Success) ---")
-            logger.info(f"Duration: {end_time - start_time:.3f}s")
-            
-            if response.text:
-                return response.text
-            else:
-                logger.warning("Gemini returned successfully but no text exists.")
-                return None
+        for attempt in range(1, 4):
+            try:
+                response = self.client.models.generate_content(
+                    model=self._model_name,
+                    contents=prompt,
+                    config=config
+                )
                 
-        except Exception as e:
-            end_time = time.time()
-            logger.error(f"--- GEMINI REQUEST END (Failed) ---")
-            logger.error(f"Duration: {end_time - start_time:.3f}s")
-            logger.error(f"Exception Type: {type(e).__name__}")
-            logger.error(f"Exception Message: {str(e)}")
-            logger.exception("Complete traceback for Gemini API failure:")
-            
-            raise e
+                end_time = time.time()
+                logger.info(f"--- GEMINI REQUEST END (Success) ---")
+                logger.info(f"Duration: {end_time - start_time:.3f}s")
+                
+                if response.text:
+                    return response.text
+                else:
+                    logger.warning("Gemini returned successfully but no text exists.")
+                    return None
+                    
+            except Exception as e:
+                end_time = time.time()
+                logger.warning(f"Gemini API failure (attempt {attempt}/3): {type(e).__name__} - {str(e)}")
+                if attempt == 3:
+                    logger.error(f"--- GEMINI REQUEST END (Failed all retries) ---")
+                    logger.error(f"Duration: {end_time - start_time:.3f}s")
+                    logger.exception("Complete traceback for Gemini API failure:")
+                    raise e
+                time.sleep(2 ** attempt)  # Exponential backoff (2s, 4s)
 
     def health_check(self) -> bool:
         return bool(self.client and self.api_key)

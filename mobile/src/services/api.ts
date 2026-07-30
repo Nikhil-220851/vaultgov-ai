@@ -421,8 +421,8 @@ async function fetchWithRetry<T>(
         }
       }
 
-      // Do not retry on client deterministic errors (4xx)
-      if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+      // Do not retry on client deterministic errors (4xx) or server bugs (500)
+      if (err instanceof ApiError && ((err.status >= 400 && err.status < 500) || err.status === 500)) {
         throw err;
       }
 
@@ -764,7 +764,7 @@ export const apiClient = {
       headers: headers,
       body: reqBody,
       signal,
-    });
+    }, API_TIMEOUT_MS, 0); // No retries for non-idempotent chat requests
     return response;
   },
 

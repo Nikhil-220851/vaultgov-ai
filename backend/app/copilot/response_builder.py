@@ -90,10 +90,17 @@ def build_response(
                 doc_lines.append(f"- {doc.title}{category_part} [Status: {status_label}]")
             
             message = "Here are your uploaded documents:\n" + "\n".join(doc_lines)
-            sources = [
-                CopilotSource(type="document", id=str(doc.id), title=doc.title)
-                for doc in docs
-            ]
+            
+            # If the user requested a specific document type but it was not found, don't supply sources
+            # because the card renderer would just pick the first unrelated document
+            requested_found = doc_res.get("requested_doc_found")
+            if requested_found is False:
+                sources = []
+            else:
+                sources = [
+                    CopilotSource(type="document", id=str(doc.id), title=doc.title)
+                    for doc in docs
+                ]
 
     # 3. DOCUMENT_REMINDER
     elif intent == Intent.DOCUMENT_REMINDER:
@@ -390,13 +397,31 @@ def build_response(
     cards = CardBuilder.build(intent, metadata)
     quick_replies = QuickReplyBuilder.build(intent, metadata)
 
-    return ChatResponse(
-        message="",
-        intent=intent,
-        confidence=confidence,
-        actions=actions,
-        cards=cards,
-        quick_replies=quick_replies,
-        sources=sources,
-        metadata=metadata
-    )
+    try:
+        # Validate through Pydantic to ensure serialization success
+        response = ChatResponse.model_validate({
+            "message": message,
+            "intent": intent,
+            "confidence": confidence,
+            "actions": actions,
+            "cards": cards,
+            "quick_replies": quick_replies,
+            "sources": sources,
+            "metadata": metadata
+        })
+        return response
+    except Exception as e:
+        import logging
+        logger = logging.getLogger("app.copilot.response_builder")
+        logger.error(f"ChatResponse validation failed for intent={intent}: {e}")
+        # Fallback to a safe response
+        return ChatResponse(
+            message="An internal error occurred while formatting your response. Please try again.",
+            intent=Intent.UNKNOWN,
+            confidence=0.0,
+            actions=[],
+            cards=[],
+            quick_replies=[],
+            sources=[],
+            metadata={"error": "Serialization failure"}
+        )

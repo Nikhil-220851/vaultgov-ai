@@ -41,9 +41,15 @@ class ContextBuilder:
         # 5. Relevant Documents
         docs_payload = data.get("documents", {})
         if docs_payload:
+            requested_found = docs_payload.get("requested_doc_found")
+            requested_type = docs_payload.get("requested_doc_type")
+            
+            doc_lines = ["Relevant Documents:"]
+            if requested_found is False and requested_type:
+                doc_lines.append(f"- The user's {requested_type} was NOT found in their VaultGov locker. Inform the user.")
+            
             doc_list = docs_payload.get("documents", [])
             if doc_list:
-                doc_lines = ["Relevant Documents:"]
                 for d in doc_list:
                     # Depending on how it's passed (model vs dict)
                     if isinstance(d, dict):

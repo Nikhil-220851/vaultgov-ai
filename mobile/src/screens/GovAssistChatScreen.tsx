@@ -385,13 +385,6 @@ export function GovAssistChatScreen() {
         timestamp: getFormattedTime(),
         cardData,
       };
-      console.log(`[GovAssistChatScreen] Created AI Message: ID=${aiMsgId}, text="${response.message}"`);
-
-      console.log("===== COPILOT RESPONSE =====");
-      console.log(JSON.stringify(response, null, 2));
-      console.log("============================");
-      console.log("Card Data:", cardData);
-
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
       if (err.name === 'AbortError' || (err.message && err.message.includes('abort'))) {
@@ -584,7 +577,12 @@ export function GovAssistChatScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.chatArea}>
-          {messages.length === 0 ? (
+          {isLoadingHistory ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={Colors.primaryBlue} />
+              <Text style={{ marginTop: 10, color: Colors.darkGray }}>Loading conversation...</Text>
+            </View>
+          ) : messages.length === 0 ? (
             renderWelcomeState()
           ) : (
             <FlatList
@@ -593,6 +591,7 @@ export function GovAssistChatScreen() {
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.messageList}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
               onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
               onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
               renderItem={({ item }) => (
@@ -615,7 +614,7 @@ export function GovAssistChatScreen() {
 
           {/* Quick chips bar */}
           <View style={styles.chipsBar}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll} keyboardShouldPersistTaps="handled">
               {QUICK_CHIPS.map((chip) => (
                 <QuickChip key={`chip-${chip}`} label={chip} onPress={() => handleSend(chip)} />
               ))}

@@ -14,7 +14,8 @@ class ConversationRepository:
         return conversation
 
     def get_conversation(self, conversation_id: str) -> Optional[Conversation]:
-        return self.db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.is_deleted == False).first()
+        from sqlalchemy.orm import joinedload
+        return self.db.query(Conversation).options(joinedload(Conversation.messages)).filter(Conversation.id == conversation_id, Conversation.is_deleted == False).first()
 
     def get_user_conversations(self, user_id: str, limit: int = 20, offset: int = 0) -> List[Conversation]:
         return (
