@@ -7,7 +7,9 @@ Schemas:
     NotificationResponse        — single notification returned from all GET endpoints
     NotificationListResponse    — paginated list wrapper
     UnreadCountResponse         — badge count
-    RegisterPushTokenRequest    — POST /notifications/register-push-token body
+    RegisterDeviceRequest       — POST /notifications/register-device body
+    SendNotificationRequest     — POST /notifications/send body
+    RegisterPushTokenRequest    — POST /notifications/register-push-token body (deprecated)
     MarkReadResponse            — PATCH /notifications/{id}/read response
     BulkActionResponse          — PATCH /notifications/read-all, DELETE /notifications/clear
 """
@@ -81,6 +83,31 @@ class RegisterPushTokenRequest(BaseModel):
             raise ValueError("Push token cannot be blank.")
         # Accept both ExponentPushToken[...] and bare tokens for flexibility
         return v
+
+
+class RegisterDeviceRequest(BaseModel):
+    """
+    Body for POST /notifications/register-device.
+    """
+    device_token: str = Field(..., min_length=1, max_length=500)
+    platform: str = Field(..., description="e.g., 'android', 'ios', 'web'")
+
+    @field_validator("device_token")
+    @classmethod
+    def token_must_not_be_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Device token cannot be blank.")
+        return v
+
+
+class SendNotificationRequest(BaseModel):
+    """
+    Body for POST /notifications/send.
+    """
+    title: str = Field(..., min_length=1, max_length=255)
+    body: str = Field(..., min_length=1)
+    data: Optional[dict[str, Any]] = None
 
 
 class MarkReadResponse(BaseModel):

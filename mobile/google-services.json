@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1063458205440",
+    "project_id": "vaultgov",
+    "storage_bucket": "vaultgov.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1063458205440:android:8b07610cd8469d835c0de5",
+        "android_client_info": {
+          "package_name": "com.vaultgov.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1063458205440-mdstrg928c4q0o7d67gmorr3d1ao09ee.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmZbDBClmbx0rBaaU378186xDhdKwJGe8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1063458205440-mdstrg928c4q0o7d67gmorr3d1ao09ee.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -27,11 +27,13 @@ from app.schemas.notification import (
     MarkReadResponse,
     NotificationListResponse,
     NotificationResponse,
-    RegisterPushTokenRequest,
+    RegisterDeviceRequest,
+    SendNotificationRequest,
     UnreadCountResponse,
 )
 from app.services import user_service
 from app.services.notification_service import notification_manager
+from app.services.fcm_service import fcm_service
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -173,28 +175,42 @@ def delete_notification(
         )
 
 
-# ─── POST /notifications/register-push-token ─────────────────────────────────
+# ─── POST /notifications/register-device ──────────────────────────────────────
 
-@router.post("/register-push-token", status_code=status.HTTP_200_OK)
-def register_push_token(
-    body: RegisterPushTokenRequest,
+@router.post("/register-device", status_code=status.HTTP_200_OK)
+def register_device(
+    body: RegisterDeviceRequest,
     db: Session = Depends(get_db),
     current_uid: str = Depends(get_current_uid),
 ) -> dict:
     """
-    Stores the Expo push notification token for the authenticated user.
-
-    Call this immediately after the user grants notification permissions in the app,
-    and again on each app launch to handle token rotation.
-
-    Returns:
-        {"success": true}
+    Stores an FCM device token for the authenticated user.
+    Supports multiple devices per user.
     """
     user_id = _get_user_id(db, current_uid)
-    ok = notification_manager.register_push_token(db, user_id, body.token)
+    ok = notification_manager.register_device_token(
+        db, user_id, body.device_token, body.platform
+    )
     if not ok:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found.",
         )
     return {"success": True}
+
+# ─── POST /notifications/send ────────────────────────────────────────────────
+
+@router.post("/send", status_code=status.HTTP_200_OK)
+def send_notification(
+    body: SendNotificationRequest,
+    db: Session = Depends(get_db),
+    current_uid: str = Depends(get_current_uid),
+) -> dict:
+    """
+    Sends an ad-hoc FCM notification to the authenticated user's active devices.
+    """
+    user_id = _get_user_id(db, current_uid)
+    result = fcm_service.send_multicast(
+        db, user_id, body.title, body.body, body.data
+    )
+    return result

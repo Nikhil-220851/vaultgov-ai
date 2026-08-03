@@ -452,6 +452,14 @@ export const apiClient = {
     _authToken = null;
   },
 
+  async registerDeviceToken(token: string, platform: string): Promise<void> {
+    return fetchWithRetry<void>(`${API_BASE_URL}/api/v1/notifications/register-device`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ device_token: token, platform }),
+    });
+  },
+
   async upsertUser(payload: UserCreatePayload): Promise<VaultGovUser> {
     return fetchWithRetry<VaultGovUser>(`${API_BASE_URL}/api/v1/users/`, {
       method: 'POST',

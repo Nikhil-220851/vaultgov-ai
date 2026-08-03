@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app.models.notification import Notification
 from app.models.user import User
+from app.models.device_token import DeviceToken
 
 logger = logging.getLogger(__name__)
 
@@ -268,6 +269,68 @@ class NotificationManager:
             db.commit()
             logger.info("[NotificationManager] Push token registered for user %s", user_id)
         return True
+
+    def register_device_token(
+        self,
+        db: Session,
+        user_id: UUID,
+        device_token: str,
+        platform: str,
+    ) -> bool:
+        """
+        Stores or updates an FCM device token for a user.
+
+        Args:
+            db:           SQLAlchemy session
+            user_id:      Target user UUID
+            device_token: FCM device token
+            platform:     'android', 'ios', or 'web'
+
+        Returns:
+            True if token was registered, False if user not found.
+        """
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            logger.warning("[NotificationManager] register_device_token: user %s not found", user_id)
+            return False
+
+        # Upsert device token
+        existing_token = db.query(DeviceToken).filter(
+            DeviceToken.user_id == user_id,
+            DeviceToken.token == device_token,
+        ).first()
+
+        if existing_token:
+            if not existing_token.is_active or existing_token.platform != platform:
+                existing_token.is_active = True
+                existing_token.platform = platform
+                db.commit()
+        else:
+            new_token = DeviceToken(
+                user_id=user_id,
+                token=device_token,
+                platform=platform,
+                is_active=True,
+            )
+            db.add(new_token)
+            db.commit()
+
+        logger.info("[NotificationManager] FCM token registered for user %s (%s)", user_id, platform)
+        return True
+
+    def remove_device_token(
+        self,
+        db: Session,
+        token: str,
+    ) -> None:
+        """
+        Removes an FCM device token (e.g., when it becomes invalid).
+        """
+        device = db.query(DeviceToken).filter(DeviceToken.token == token).first()
+        if device:
+            db.delete(device)
+            db.commit()
+            logger.info("[NotificationManager] Removed invalid FCM token: %s...", token[:10])
 
     # ── Push dispatch helpers ──────────────────────────────────────────────────
 

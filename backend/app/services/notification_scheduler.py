@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.services.notification_engine import NotificationEngine
 from app.services.notification_service import NotificationManager
-from app.services.push_service import ExpoPushService
+from app.services.fcm_service import FCMService
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ class NotificationScheduler:
         db = self._make_session()
         engine = NotificationEngine()
         manager = NotificationManager()
-        push = ExpoPushService()
+        push = FCMService()
 
         try:
             expiry_count = engine.generate_expiry_notifications(db)
@@ -102,14 +102,13 @@ class NotificationScheduler:
             ai_count = engine.generate_ai_notifications(db)
             logger.info("[NotificationScheduler] Daily — AI notifications: %d", ai_count)
 
-            pushed = push.dispatch_pending(db, manager)
+            pushed = push.dispatch_pending(db)
             logger.info("[NotificationScheduler] Daily — push dispatched: %d", pushed)
 
         except Exception as exc:
             logger.error("[NotificationScheduler] Daily job failed: %s", exc, exc_info=True)
         finally:
             db.close()
-            push.close()
 
     def _run_weekly_job(self) -> None:
         """
@@ -121,20 +120,19 @@ class NotificationScheduler:
         db = self._make_session()
         engine = NotificationEngine()
         manager = NotificationManager()
-        push = ExpoPushService()
+        push = FCMService()
 
         try:
             count = engine.generate_weekly_summary(db)
             logger.info("[NotificationScheduler] Weekly — summary notifications: %d", count)
 
-            pushed = push.dispatch_pending(db, manager)
+            pushed = push.dispatch_pending(db)
             logger.info("[NotificationScheduler] Weekly — push dispatched: %d", pushed)
 
         except Exception as exc:
             logger.error("[NotificationScheduler] Weekly job failed: %s", exc, exc_info=True)
         finally:
             db.close()
-            push.close()
 
     def _run_monthly_job(self) -> None:
         """
@@ -144,20 +142,19 @@ class NotificationScheduler:
         db = self._make_session()
         engine = NotificationEngine()
         manager = NotificationManager()
-        push = ExpoPushService()
+        push = FCMService()
 
         try:
             count = engine.generate_monthly_report(db)
             logger.info("[NotificationScheduler] Monthly — report notifications: %d", count)
 
-            pushed = push.dispatch_pending(db, manager)
+            pushed = push.dispatch_pending(db)
             logger.info("[NotificationScheduler] Monthly — push dispatched: %d", pushed)
 
         except Exception as exc:
             logger.error("[NotificationScheduler] Monthly job failed: %s", exc, exc_info=True)
         finally:
             db.close()
-            push.close()
 
     # ── Scheduling logic ──────────────────────────────────────────────────────
 

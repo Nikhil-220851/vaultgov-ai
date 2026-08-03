@@ -35,13 +35,13 @@ export const useGoogleAuth = () => {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const signInResult = await GoogleSignin.signIn();
 
-      if (!signInResult) {
+      if (!signInResult || signInResult.type !== 'success') {
         console.log('[GoogleAuth] Google Sign-In was cancelled or did not succeed.');
         return null;
       }
 
       console.log('Google Account Selected');
-      const idToken = signInResult.idToken;
+      const idToken = signInResult.data.idToken;
       if (!idToken) {
         console.error('[GoogleAuth] No idToken received from native Google Sign-In.');
         return null;

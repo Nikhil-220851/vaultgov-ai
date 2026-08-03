@@ -6,12 +6,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { UserProvider, useUser } from '@/context/UserContext';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { NotificationProvider } from '@/context/NotificationProvider';
-import { pushNotificationService } from '@/services/pushNotificationService';
+import { notificationService } from '@/services/NotificationService';
 import { useRouter, useRootNavigationState } from 'expo-router';
 import { useEffect, ReactNode } from 'react';
 
 function NotificationBootstrap({ children }: { children: ReactNode }) {
-  const { user } = useUser();
+  const { firebaseUser } = useUser();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
   const startPolling = useNotificationStore((state) => state.startPolling);
@@ -23,22 +23,18 @@ function NotificationBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isNavigationReady) return;
 
-    let unsubscribeNotifications: (() => void) | undefined;
-
-    if (user) {
+    if (firebaseUser) {
       startPolling();
-      unsubscribeNotifications = pushNotificationService.setupNotificationHandlers(router);
-      pushNotificationService.registerForPushNotificationsAsync();
+      notificationService.setupNotificationHandlers(router);
+
+      return () => {
+        notificationService.removeNotificationHandlers();
+        stopPolling();
+      };
     } else {
       stopPolling();
     }
-
-    return () => {
-      if (unsubscribeNotifications) {
-        unsubscribeNotifications();
-      }
-    };
-  }, [user, router, isNavigationReady, startPolling, stopPolling]);
+  }, [firebaseUser, router, isNavigationReady, startPolling, stopPolling]);
 
   return <>{children}</>;
 }
