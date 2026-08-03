@@ -1,7 +1,7 @@
 import { GoogleAuthProvider, signInWithCredential, User, signOut, PhoneAuthProvider } from 'firebase/auth';
 import { auth } from './firebase';
 import { AuthResponse } from '@/features/auth/types/auth.types';
-import { GoogleSignin, statusCodes, isSuccessResponse } from '@react-native-google-signin/google-signin';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
 // Module-level cache for holding verificationId during OTP flow
 let tempVerificationId: string | null = null;
@@ -35,13 +35,13 @@ export const useGoogleAuth = () => {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const signInResult = await GoogleSignin.signIn();
 
-      if (!isSuccessResponse(signInResult)) {
+      if (!signInResult) {
         console.log('[GoogleAuth] Google Sign-In was cancelled or did not succeed.');
         return null;
       }
 
       console.log('Google Account Selected');
-      const idToken = signInResult.data.idToken;
+      const idToken = signInResult.idToken;
       if (!idToken) {
         console.error('[GoogleAuth] No idToken received from native Google Sign-In.');
         return null;

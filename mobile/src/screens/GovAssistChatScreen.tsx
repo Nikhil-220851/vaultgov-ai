@@ -77,7 +77,7 @@ function extractCardDataFromMetadata(intent: string, metadata: any): AICardData 
       const isDanger = doc.visual_state === 'danger';
       
       let badge = isSuccess ? 'Verified' : isWarning ? 'Needs Attention' : isDanger ? 'Action Required' : 'Uploaded';
-      let badgeColor = isSuccess ? Colors.primaryGreen : isWarning ? Colors.primaryOrange : isDanger ? Colors.dangerRed : Colors.darkGray;
+      let badgeColor: string = isSuccess ? Colors.primaryGreen : isWarning ? Colors.primaryOrange : isDanger ? Colors.dangerRed : Colors.darkGray;
       let primaryActionLabel = (isWarning || isDanger) ? 'Renew Now' : 'Locker Details';
       let expiryInfo = 'Permanent';
 
@@ -137,7 +137,7 @@ function extractCardDataFromMetadata(intent: string, metadata: any): AICardData 
       
       const docStatus = doc.status ? String(doc.status).toUpperCase() : '';
       let badge = 'Expiring Soon';
-      let badgeColor = Colors.primaryOrange;
+      let badgeColor: string = Colors.primaryOrange;
       
       if (docStatus === 'EXPIRED') {
         badge = 'Expired';
@@ -573,7 +573,7 @@ export function GovAssistChatScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.chatArea}>
@@ -592,6 +592,7 @@ export function GovAssistChatScreen() {
               contentContainerStyle={styles.messageList}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
               onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
               renderItem={({ item }) => (

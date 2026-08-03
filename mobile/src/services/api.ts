@@ -18,7 +18,6 @@ import { auth } from '@/services/firebase';
 // ─── Error Types ──────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
-  public readonly status: number;
   public readonly statusText?: string;
   public readonly responseBody?: string;
   public readonly url?: string;

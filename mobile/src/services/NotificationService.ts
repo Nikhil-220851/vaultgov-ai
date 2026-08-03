@@ -39,23 +39,23 @@ class NotificationService {
       });
     }
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    const { granted: existingGranted } = await Notifications.getPermissionsAsync();
+    let finalGranted = existingGranted;
     
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+    if (!existingGranted) {
+      const { granted } = await Notifications.requestPermissionsAsync();
+      finalGranted = granted;
     }
 
-    return finalStatus === 'granted';
+    return finalGranted;
   }
 
   /**
    * Check if permissions are currently granted.
    */
   async checkPermissionStatus(): Promise<boolean> {
-    const { status } = await Notifications.getPermissionsAsync();
-    return status === 'granted';
+    const { granted } = await Notifications.getPermissionsAsync();
+    return granted;
   }
 
   /**

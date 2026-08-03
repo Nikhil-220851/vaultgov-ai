@@ -1,22 +1,21 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.ai.gemini_service import GeminiService
+from app.ai.providers.provider_factory import ProviderFactory
 
 router = APIRouter()
 
-# Single instance for the test endpoint
-gemini_service = GeminiService()
-
-class TestGeminiRequest(BaseModel):
+class TestAIRequest(BaseModel):
     message: str
 
-class TestGeminiResponse(BaseModel):
+class TestAIResponse(BaseModel):
     reply: str
+    provider: str
 
-@router.post("/test-gemini", response_model=TestGeminiResponse)
-def test_gemini(request: TestGeminiRequest):
+@router.post("/test-ai", response_model=TestAIResponse)
+def test_ai(request: TestAIRequest):
     """
-    Temporary endpoint to verify Gemini connectivity.
+    Temporary endpoint to verify AI Provider connectivity.
     """
-    reply = gemini_service.generate_response(request.message)
-    return TestGeminiResponse(reply=reply)
+    provider = ProviderFactory.get_provider()
+    reply = provider.generate_response(request.message)
+    return TestAIResponse(reply=reply or "", provider=provider.provider_name)

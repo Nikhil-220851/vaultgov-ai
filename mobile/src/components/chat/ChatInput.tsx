@@ -51,9 +51,10 @@ export function ChatInput({
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={Colors.darkGray}
-          multiline={false}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
+          multiline={true}
+          // Usually in mobile chat apps, we don't submit on enter if multiline, but we can keep it as is or remove onSubmitEditing if it causes issues. The prompt asks to keep multiline behavior and send button.
+          // We remove onSubmitEditing because with multiline=true it causes issues sometimes, but wait, the prompt says "Keep multiline TextInput behavior." 
+          // So I will just set multiline={true}.
         />
 
         <TouchableOpacity
@@ -84,7 +85,7 @@ export function ChatInput({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     paddingHorizontal: Spacing.md,
     paddingTop: 10,
     paddingBottom: Platform.OS === 'ios' ? 24 : 14,
@@ -95,11 +96,13 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     backgroundColor: '#F5F5F7',
     borderRadius: Radius.button,
     paddingHorizontal: 8,
-    height: 48,
+    minHeight: 48,
+    maxHeight: 120,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
     marginRight: 10,
     borderWidth: 1,
     borderColor: '#EAEAEA',
@@ -110,11 +113,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: Platform.OS === 'ios' ? 0 : 2, // Align to bottom
   },
   textInput: {
     flex: 1,
-    height: '100%',
+    minHeight: Platform.OS === 'ios' ? 32 : 40,
     paddingHorizontal: 8,
+    paddingTop: Platform.OS === 'ios' ? 6 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 6 : 8,
     fontSize: Typography.sizes.sm,
     color: Colors.pureBlack,
     fontFamily: Typography.fontFamilies.sans,
